@@ -4,7 +4,14 @@ A comprehensive Claude Code skill for molecular dynamics simulations using GROMA
 
 ## Installation
 
-The skill has been installed in `.claude/skills/gromacs-skill/`. Claude Code will automatically detect and load it.
+Clone this repository and the skill will be automatically detected by Claude Code from `.claude/skills/gromacs-skill/`:
+
+```bash
+git clone https://github.com/aaltamimi2/gromacs-claudecode-skill.git
+cd gromacs-claudecode-skill
+```
+
+The `.claude/skills/gromacs-skill/` directory contains symlinks to the root-level SKILL.md, references/, and scripts/ directories.
 
 ## Usage
 
@@ -39,35 +46,39 @@ mpirun -np 1 gmx_mpi pdb2gmx -f input.pdb -o output.gro
 mpirun -np 16 gmx_mpi mdrun -deffnm production
 ```
 
-See `.claude/skills/gromacs-skill/references/mpi-configuration.md` for detailed MPI setup.
+See `references/mpi-configuration.md` for detailed MPI setup.
 
 ### Using the Wrapper Script
 
 A wrapper script is provided to automatically handle MPI:
 
 ```bash
-.claude/skills/gromacs-skill/scripts/gmx_wrapper.sh pdb2gmx -f input.pdb
+scripts/gmx_wrapper.sh pdb2gmx -f input.pdb
 ```
 
 Or create an alias:
 ```bash
-alias gmx='<full-path>/gromacs-claudecode-skill/.claude/skills/gromacs-skill/scripts/gmx_wrapper.sh'
+alias gmx='<full-path>/gromacs-claudecode-skill/scripts/gmx_wrapper.sh'
 ```
 
-## Documentation Structure
+## Repository Structure
 
 ```
-.claude/skills/gromacs-skill/
+gromacs-claudecode-skill/
 ├── SKILL.md                          # Main skill file
-├── references/
+├── references/                       # Detailed documentation
 │   ├── mdp-templates.md             # .mdp parameter examples
 │   ├── free-energy.md               # Free energy calculations
 │   ├── troubleshooting.md           # Error diagnosis and fixes
 │   ├── hpc-scripts.md               # HPC job templates
 │   └── mpi-configuration.md         # MPI setup guide
-└── scripts/
-    ├── gmx_wrapper.sh               # Automatic gmx/gmx_mpi handler
-    └── check_equilibration.py       # Equilibration validation
+├── scripts/                          # Utility scripts
+│   ├── gmx_wrapper.sh               # Automatic gmx/gmx_mpi handler
+│   └── check_equilibration.py       # Equilibration validation
+└── .claude/skills/gromacs-skill/    # Symlinks for Claude Code
+    ├── SKILL.md -> ../../../SKILL.md
+    ├── references -> ../../../references
+    └── scripts -> ../../../scripts
 ```
 
 ## Quick Start Example
@@ -89,7 +100,7 @@ mpirun -np 1 gmx_mpi grompp -f nvt.mdp -c em.gro -p topol.top -o nvt.tpr
 mpirun -np 1 gmx_mpi mdrun -deffnm nvt
 
 # 5. Check equilibration
-python .claude/skills/gromacs-skill/scripts/check_equilibration.py nvt.edr
+python scripts/check_equilibration.py nvt.edr
 ```
 
 ## Troubleshooting Common Errors
@@ -109,9 +120,11 @@ See the troubleshooting reference for comprehensive error solutions.
 ## Contributing
 
 To extend the skill:
-1. Edit `.claude/skills/gromacs-skill/SKILL.md` for main instructions
+1. Edit `SKILL.md` for main instructions
 2. Add detailed guides in `references/`
 3. Add utility scripts in `scripts/`
+
+The `.claude/skills/gromacs-skill/` directory will automatically pick up changes via symlinks.
 
 ## License
 
