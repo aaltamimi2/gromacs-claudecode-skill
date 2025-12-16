@@ -142,8 +142,9 @@ For detailed information, see:
 - **[references/mdp-templates.md](references/mdp-templates.md)**: Complete .mdp examples for EM, NVT, NPT, production, and specialized runs
 - **[references/free-energy.md](references/free-energy.md)**: Umbrella sampling, steered MD, PMF calculations, FEP
 - **[references/troubleshooting.md](references/troubleshooting.md)**: Common errors (LINCS, exploding systems, NaN) and fixes
-- **[references/hpc-scripts.md](references/hpc-scripts.md)**: SLURM job templates for CPU/GPU clusters
 - **[references/mpi-configuration.md](references/mpi-configuration.md)**: gmx vs gmx_mpi setup, PLUMED issues
+
+**Note**: Create cluster-specific workflow files (like swarm-workflow.md) for each HPC resource you use, as requirements vary significantly between clusters.
 
 ## Quick Troubleshooting
 
