@@ -26,12 +26,16 @@ gmx pdb2gmx -f input.pdb -o processed.gro -water tip3p -ff charmm27
 
 # Define box and solvate
 gmx editconf -f processed.gro -o boxed.gro -c -d 1.2 -bt dodecahedron
+
+# Add WATER using gmx solvate (for SPC, TIP3P, TIP4P water models)
 gmx solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
 
 # Add ions to neutralize
 gmx grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr
 gmx genion -s ions.tpr -o system.gro -p topol.top -pname NA -nname CL -neutral
 ```
+
+**Note**: Use `gmx solvate` for water, `gmx insert-molecules` for all other solvents (see below).
 
 #### Ligand/Small Molecule Parameterization
 ```bash
@@ -57,6 +61,33 @@ python scripts/solvent_to_gmx.py \
 ```
 
 See [references/ligand-parameterization.md](references/ligand-parameterization.md) for detailed ligand setup.
+
+#### Solvation Guide
+
+**Use `gmx solvate` for WATER:**
+```bash
+# Standard water solvation (SPC, TIP3P, TIP4P models)
+gmx solvate -cp protein.gro -cs spc216.gro -o solvated.gro -p topol.top
+
+# With custom box
+gmx solvate -cp protein.gro -cs spc216.gro -box 8 8 8 -o solvated.gro -p topol.top
+
+# Add water shell around protein
+gmx solvate -cp protein.gro -cs spc216.gro -shell 1.0 -o solvated.gro -p topol.top
+```
+
+**Use `gmx insert-molecules` for NON-WATER solvents:**
+```bash
+# Add organic solvent (e.g., ethanol, DMSO, ionic liquids)
+gmx insert-molecules -f protein.gro -ci ethanol.gro -nmol 500 -o solvated.gro
+
+# Create pure solvent box
+gmx insert-molecules -ci hexane.gro -nmol 100 -box 5 5 5 -o hexane_box.gro
+
+# Mixed solvents (water + organic)
+gmx solvate -cp protein.gro -cs spc216.gro -o water_solvated.gro -p topol.top
+gmx insert-molecules -f water_solvated.gro -ci dmso.gro -nmol 50 -o mixed_solvent.gro
+```
 
 ### 2. Energy Minimization
 ```bash
@@ -116,6 +147,15 @@ Key flags:
 | `gmx sasa` | Solvent-accessible surface area | `-surface`, `-output` selections |
 | `gmx rdf` | Radial distribution functions | `-ref`, `-sel` groups |
 | `gmx trjconv` | Trajectory processing/PBC fixing | `-pbc mol`, `-center`, `-fit` |
+
+### Solvation Tools
+
+| Tool | Use Case | Example |
+|------|----------|---------|
+| `gmx solvate` | **Water only** (SPC, TIP3P, TIP4P) | `gmx solvate -cp protein.gro -cs spc216.gro -o solvated.gro -p topol.top` |
+| `gmx insert-molecules` | **All non-water solvents** (organic, ionic liquids, etc.) | `gmx insert-molecules -f protein.gro -ci ethanol.gro -nmol 500 -o solvated.gro` |
+
+**Key difference**: `gmx solvate` intelligently fills space and updates topology; `gmx insert-molecules` randomly inserts molecules.
 
 ## Default Parameters
 
