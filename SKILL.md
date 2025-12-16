@@ -106,6 +106,7 @@ For detailed information, see:
 - **[references/free-energy.md](references/free-energy.md)**: Umbrella sampling, steered MD, PMF calculations, FEP
 - **[references/troubleshooting.md](references/troubleshooting.md)**: Common errors (LINCS, exploding systems, NaN) and fixes
 - **[references/hpc-scripts.md](references/hpc-scripts.md)**: SLURM job templates for CPU/GPU clusters
+- **[references/mpi-configuration.md](references/mpi-configuration.md)**: gmx vs gmx_mpi setup, PLUMED issues
 
 ## Quick Troubleshooting
 
@@ -116,5 +117,8 @@ For detailed information, see:
 | NaN in energy | Unstable simulation | Reduce dt, check parameters |
 | Density too low/high | Wrong pressure coupling | Check barostat settings, ref_p |
 | Temperature drift | Thermostat misconfigured | Check tc-grps match index |
+| PLUMED symbol error | PLUMED library not loaded | Set LD_LIBRARY_PATH or use gmx |
 
-See [references/troubleshooting.md](references/troubleshooting.md) for detailed diagnostics.
+See [references/troubleshooting.md](references/troubleshooting.md) and [references/mpi-configuration.md](references/mpi-configuration.md) for detailed diagnostics.
+
+**Note**: Examples use `gmx` for simplicity. Prefer `gmx_mpi` when available (see mpi-configuration.md).
