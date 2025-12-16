@@ -1,6 +1,6 @@
 ---
 name: gromacs
-description: "Create, run, and analyze molecular dynamics simulations using GROMACS. Use this skill when the user asks for: (1) System setup and topology preparation, (2) .mdp parameter file design, (3) Simulation workflows (EM → NVT → NPT → production), (4) HPC job scripts and performance tuning, (5) Trajectory analysis (energy, density, MSD, SASA, RDF), (6) Free energy calculations (umbrella sampling, FEP, PMF), (7) Troubleshooting simulation failures (LINCS, exploding systems, barostat instability)."
+description: "Create, run, and analyze molecular dynamics simulations using GROMACS. Use this skill when the user asks for: (1) System setup and topology preparation, (2) Ligand parameterization and small molecule setup, (3) .mdp parameter file design, (4) Simulation workflows (EM → NVT → NPT → production), (5) HPC job scripts and performance tuning, (6) Trajectory analysis (energy, density, MSD, SASA, RDF), (7) Free energy calculations (umbrella sampling, FEP, PMF), (8) Troubleshooting simulation failures (LINCS, exploding systems, barostat instability, PLUMED errors)."
 ---
 
 # GROMACS Molecular Dynamics Skill
@@ -18,6 +18,8 @@ Before writing commands, identify:
 ## Standard Workflow
 
 ### 1. System Preparation
+
+#### Protein Systems
 ```bash
 # Generate topology (example for protein)
 gmx pdb2gmx -f input.pdb -o processed.gro -water tip3p -ff charmm27
@@ -30,6 +32,23 @@ gmx solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
 gmx grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr
 gmx genion -s ions.tpr -o system.gro -p topol.top -pname NA -nname CL -neutral
 ```
+
+#### Ligand/Small Molecule Parameterization
+```bash
+# Automated parameterization from compound name
+python scripts/ligand_setup.py --name "hexane" --resname HEX
+
+# Outputs:
+# - HEX.acpype/HEX_GMX.itp (topology)
+# - HEX.acpype/HEX_GMX.gro (structure)
+# - HEX.acpype/atomtypes.itp (force field parameters)
+
+# Include in topology:
+# #include "HEX.acpype/atomtypes.itp"
+# #include "HEX.acpype/HEX_GMX.itp"
+```
+
+See [references/ligand-parameterization.md](references/ligand-parameterization.md) for detailed ligand setup.
 
 ### 2. Energy Minimization
 ```bash
@@ -99,9 +118,16 @@ Unless specified otherwise, use:
 - **Constraints**: `h-bonds` with LINCS (or `all-bonds` if needed)
 - **Time step**: 2 fs (with h-bond constraints), 1 fs (unconstrained)
 
+## Utility Scripts
+
+- **scripts/ligand_setup.py**: Automated ligand parameterization (PubChem → RDKit → ACPYPE)
+- **scripts/check_equilibration.py**: Validate NVT/NPT equilibration quality
+- **scripts/gmx_wrapper.sh**: Auto-detect gmx_mpi vs gmx
+
 ## Reference Files
 
 For detailed information, see:
+- **[references/ligand-parameterization.md](references/ligand-parameterization.md)**: Ligand topology generation, ACPYPE, CGenFF, ATB
 - **[references/mdp-templates.md](references/mdp-templates.md)**: Complete .mdp examples for EM, NVT, NPT, production, and specialized runs
 - **[references/free-energy.md](references/free-energy.md)**: Umbrella sampling, steered MD, PMF calculations, FEP
 - **[references/troubleshooting.md](references/troubleshooting.md)**: Common errors (LINCS, exploding systems, NaN) and fixes
