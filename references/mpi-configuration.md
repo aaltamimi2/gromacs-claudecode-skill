@@ -1,5 +1,32 @@
 # GROMACS Configuration Guide
 
+## Important: Run Commands As-Is
+
+**If your environment is properly configured, run `gmx_mpi` commands exactly as specified:**
+
+```bash
+# ✓ Correct - run directly
+gmx_mpi insert-molecules -f input.gro -ci ligand.gro -nmol 100 -o output.gro
+gmx_mpi grompp -f md.mdp -c input.gro -p topol.top -o md.tpr
+gmx_mpi mdrun -deffnm md
+```
+
+**DO NOT add workarounds unless specifically needed:**
+```bash
+# ✗ Wrong - unnecessary modifications
+unset PLUMED_KERNEL && gmx_mpi ...    # Don't add this
+export LD_LIBRARY_PATH=... && gmx_mpi ... # Don't add this inline
+```
+
+**Proper environment setup** (done once in `~/.bashrc`):
+```bash
+# Add to ~/.bashrc for persistent configuration
+export GMXLIB=/path/to/gromacs/share/gromacs/top
+export LD_LIBRARY_PATH=/path/to/plumed/lib:$LD_LIBRARY_PATH
+```
+
+Once your environment is configured, commands work directly without prefixes.
+
 ## Understanding gmx vs gmx_mpi
 
 GROMACS can be compiled in two modes:
@@ -69,16 +96,33 @@ module load plumed/2.9
 ldd $(which gmx_mpi) | grep plumed
 ```
 
-**Solution 2: Set LD_LIBRARY_PATH** (Workstation)
+**Solution 2: Set LD_LIBRARY_PATH** (Workstation - One-Time Setup)
+
+**Add to `~/.bashrc` for permanent fix:**
 ```bash
-# Add PLUMED library path
-export LD_LIBRARY_PATH=/path/to/plumed/lib:$LD_LIBRARY_PATH
-
-# Example:
-export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
-
-# Add to ~/.bashrc for persistence
+# Add PLUMED library path permanently
 echo 'export LD_LIBRARY_PATH=/path/to/plumed/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Example:**
+```bash
+# Find PLUMED library first
+find /home/$(whoami) -name "libplumedKernel.so*" 2>/dev/null
+
+# Then add to ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/home/username/gromacs-plumed/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**DO NOT use inline environment modifications:**
+```bash
+# ✗ Wrong - adds complexity to every command
+export LD_LIBRARY_PATH=/path/to/lib:$LD_LIBRARY_PATH && gmx_mpi ...
+unset PLUMED_KERNEL && gmx_mpi ...
+
+# ✓ Correct - set once in ~/.bashrc, then use commands normally
+gmx_mpi ...
 ```
 
 **Solution 3: Find PLUMED Installation**
