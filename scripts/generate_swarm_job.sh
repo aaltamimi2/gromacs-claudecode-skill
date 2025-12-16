@@ -58,17 +58,18 @@ fi
 # Generate job script based on type
 cat > "$OUTPUT" << 'HEADER'
 #!/bin/bash
+
 #SBATCH -p compute
-#SBATCH -t 108:00:00
+#SBATCH -t 72:00:00
 HEADER
 
 echo "#SBATCH -J $JOB_NAME" >> "$OUTPUT"
 
 cat >> "$OUTPUT" << 'FOOTER'
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=28
+#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested
 #SBATCH --mail-user=aaltamimi2@wisc.edu
-#SBATCH --mail-type=end
+#SBATCH --mail-type=end  # email me when the job ends
 
 module load gromacs
 
@@ -111,7 +112,7 @@ EOF
 
     array)
         # Update SBATCH header for array job
-        sed -i "s/#SBATCH --mail-type=end/#SBATCH --array=1-10\n#SBATCH --mail-type=end/" "$OUTPUT"
+        sed -i "s/#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested/#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested\n#SBATCH --array=1-10/" "$OUTPUT"
 
         cat >> "$OUTPUT" << 'EOF'
 # Create replica directory
@@ -144,5 +145,5 @@ echo "  Job type: $JOB_TYPE"
 echo ""
 echo "Next steps:"
 echo "  1. Review the script: cat $OUTPUT"
-echo "  2. Transfer to swarm: scp $OUTPUT swarm:~/projects/"
-echo "  3. Submit on swarm: ssh swarm 'cd ~/projects && sbatch $OUTPUT'"
+echo "  2. Transfer files: scp $OUTPUT *.gro *.top *.mdp *.itp swarm:~/claude-code-swarm/"
+echo "  3. Submit to swarm: ssh swarm 'cd ~/claude-code-swarm && sbatch $OUTPUT'"

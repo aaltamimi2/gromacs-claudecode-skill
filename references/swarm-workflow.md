@@ -41,13 +41,14 @@ gmx_mpi grompp -f em.mdp -c system.gro -p topol.top -o em.tpr
 
 ```bash
 #!/bin/bash
+
 #SBATCH -p compute
-#SBATCH -t 108:00:00
-#SBATCH -J {JOB_NAME}
+#SBATCH -t 72:00:00
+#SBATCH -J my_job
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=28
+#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested
 #SBATCH --mail-user=aaltamimi2@wisc.edu
-#SBATCH --mail-type=end
+#SBATCH --mail-type=end  # email me when the job ends
 
 # Load GROMACS module on swarm
 module load gromacs
@@ -69,48 +70,54 @@ gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 ```
 
 **Variable Substitution**:
-- `{JOB_NAME}`: Replace with your job name (e.g., `protein_md`, `ligand_binding`)
+- `#SBATCH -J my_job`: Replace `my_job` with your job name
+- `#SBATCH -t 72:00:00`: Adjust time limit as needed (max 108:00:00)
 
-### Step 3: Transfer Files to Swarm
+### Step 3: Transfer Files and Submit to Swarm
+
+**Quick Method (Recommended):**
 
 ```bash
-# Create project directory on swarm
-ssh swarm "mkdir -p ~/projects/my_simulation"
+# 1. Transfer all necessary files
+scp submit_swarm.sh *.gro *.top *.mdp *.itp swarm:~/claude-code-swarm/
 
-# Transfer input files
-scp system.gro topol.top *.mdp *.itp submit_swarm.sh \
-    swarm:~/projects/my_simulation/
-
-# If using ligands, transfer ACPYPE outputs
-scp -r LIG.acpype swarm:~/projects/my_simulation/
+# 2. Submit job directly
+ssh swarm 'cd ~/claude-code-swarm && sbatch submit_swarm.sh'
 ```
 
-### Step 4: Submit Job on Swarm
+**Alternative (Step-by-step):**
 
 ```bash
-# SSH to swarm
-ssh swarm
+# Create project directory on swarm (first time only)
+ssh swarm "mkdir -p ~/claude-code-swarm"
 
-# Navigate to project
-cd ~/projects/my_simulation
+# Transfer input files
+scp system.gro topol.top *.mdp *.itp submit_swarm.sh swarm:~/claude-code-swarm/
+
+# If using ligands, transfer ACPYPE outputs
+scp -r LIG.acpype swarm:~/claude-code-swarm/
 
 # Submit job
-sbatch submit_swarm.sh
+ssh swarm 'cd ~/claude-code-swarm && sbatch submit_swarm.sh'
+```
 
+### Step 4: Monitor Job on Swarm
+
+```bash
 # Check job status
-squeue -u aaltamimi2
+ssh swarm 'squeue -u aaltamimi2'
 
 # Monitor output
-tail -f slurm-*.out
+ssh swarm 'tail -f ~/claude-code-swarm/slurm-*.out'
 ```
 
 ### Step 5: Retrieve Results
 
 ```bash
 # From workstation, download results
-scp swarm:~/projects/my_simulation/*.xtc .
-scp swarm:~/projects/my_simulation/*.edr .
-scp swarm:~/projects/my_simulation/*.log .
+scp swarm:~/claude-code-swarm/*.xtc .
+scp swarm:~/claude-code-swarm/*.edr .
+scp swarm:~/claude-code-swarm/*.log .
 ```
 
 ## SLURM Job Templates
@@ -119,13 +126,14 @@ scp swarm:~/projects/my_simulation/*.log .
 
 ```bash
 #!/bin/bash
+
 #SBATCH -p compute
-#SBATCH -t 108:00:00
+#SBATCH -t 72:00:00
 #SBATCH -J protein_md
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=28
+#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested
 #SBATCH --mail-user=aaltamimi2@wisc.edu
-#SBATCH --mail-type=end
+#SBATCH --mail-type=end  # email me when the job ends
 
 module load gromacs
 
@@ -149,13 +157,14 @@ gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 ```bash
 #!/bin/bash
+
 #SBATCH -p compute
-#SBATCH -t 108:00:00
+#SBATCH -t 72:00:00
 #SBATCH -J md_production
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=28
+#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested
 #SBATCH --mail-user=aaltamimi2@wisc.edu
-#SBATCH --mail-type=end
+#SBATCH --mail-type=end  # email me when the job ends
 
 module load gromacs
 
@@ -167,13 +176,14 @@ gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 ```bash
 #!/bin/bash
+
 #SBATCH -p compute
-#SBATCH -t 108:00:00
+#SBATCH -t 72:00:00
 #SBATCH -J md_continue
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=28
+#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested
 #SBATCH --mail-user=aaltamimi2@wisc.edu
-#SBATCH --mail-type=end
+#SBATCH --mail-type=end  # email me when the job ends
 
 module load gromacs
 
@@ -185,14 +195,15 @@ gmx mdrun -v -deffnm md -cpi state.cpt -append -nb gpu -bonded cpu -update gpu -
 
 ```bash
 #!/bin/bash
+
 #SBATCH -p compute
-#SBATCH -t 108:00:00
+#SBATCH -t 72:00:00
 #SBATCH -J replica_array
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=28
+#SBATCH --ntasks-per-node=28              # total number of mpi tasks requested
 #SBATCH --array=1-10
 #SBATCH --mail-user=aaltamimi2@wisc.edu
-#SBATCH --mail-type=end
+#SBATCH --mail-type=end  # email me when the job ends
 
 module load gromacs
 
