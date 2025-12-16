@@ -79,33 +79,33 @@ case $JOB_TYPE in
     full)
         cat >> "$OUTPUT" << 'EOF'
 # Energy Minimization
-gmx mdrun -v -deffnm em
+gmx mdrun -nt 28 -v -deffnm em
 
 # NVT Equilibration
 gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
-gmx mdrun -deffnm nvt
+gmx mdrun -v -deffnm nvt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 # NPT Equilibration
 gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
-gmx mdrun -deffnm npt
+gmx mdrun -v -deffnm npt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 # Production MD
 gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr
-gmx mdrun -deffnm md
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 EOF
         ;;
 
     production)
         cat >> "$OUTPUT" << 'EOF'
 # Production MD (equilibration already done)
-gmx mdrun -deffnm md
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 EOF
         ;;
 
     continue)
         cat >> "$OUTPUT" << 'EOF'
 # Continue simulation from checkpoint
-gmx mdrun -deffnm md -cpi state.cpt -append
+gmx mdrun -v -deffnm md -cpi state.cpt -append -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 EOF
         ;;
 
@@ -123,15 +123,15 @@ cd $REPLICA_DIR
 cp ../em.tpr ../nvt.mdp ../npt.mdp ../md.mdp ../topol.top .
 
 # Run simulation
-gmx mdrun -deffnm em
+gmx mdrun -nt 28 -v -deffnm em
 gmx grompp -f nvt.mdp -c em.gro -p topol.top -o nvt.tpr
-gmx mdrun -deffnm nvt
+gmx mdrun -v -deffnm nvt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 gmx grompp -f npt.mdp -c nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
-gmx mdrun -deffnm npt
+gmx mdrun -v -deffnm npt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr
-gmx mdrun -deffnm md
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 EOF
         ;;
 esac

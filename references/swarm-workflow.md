@@ -53,19 +53,19 @@ gmx_mpi grompp -f em.mdp -c system.gro -p topol.top -o em.tpr
 module load gromacs
 
 # Energy Minimization
-gmx mdrun -v -deffnm em
+gmx mdrun -nt 28 -v -deffnm em
 
 # NVT Equilibration
 gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
-gmx mdrun -deffnm nvt
+gmx mdrun -v -deffnm nvt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 # NPT Equilibration
 gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
-gmx mdrun -deffnm npt
+gmx mdrun -v -deffnm npt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 # Production MD
 gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr
-gmx mdrun -deffnm md
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 ```
 
 **Variable Substitution**:
@@ -130,19 +130,19 @@ scp -r aaltamimi2@swarm.che.wisc.edu:~/projects/my_simulation/*.log .
 module load gromacs
 
 # EM
-gmx mdrun -v -deffnm em
+gmx mdrun -nt 28 -v -deffnm em
 
 # NVT
 gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
-gmx mdrun -deffnm nvt
+gmx mdrun -v -deffnm nvt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 # NPT
 gmx grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
-gmx mdrun -deffnm npt
+gmx mdrun -v -deffnm npt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 # Production
 gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr
-gmx mdrun -deffnm md
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 ```
 
 ### Template 2: Production Only (Equilibration Done)
@@ -160,7 +160,7 @@ gmx mdrun -deffnm md
 module load gromacs
 
 # Production MD
-gmx mdrun -deffnm md
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 ```
 
 ### Template 3: Continuation Run
@@ -178,7 +178,7 @@ gmx mdrun -deffnm md
 module load gromacs
 
 # Continue from checkpoint
-gmx mdrun -deffnm md -cpi state.cpt -append
+gmx mdrun -v -deffnm md -cpi state.cpt -append -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 ```
 
 ### Template 4: Array Job (Multiple Simulations)
@@ -205,15 +205,15 @@ cd $REPLICA_DIR
 cp ../em.tpr ../nvt.mdp ../npt.mdp ../md.mdp ../topol.top .
 
 # Run with different seed
-gmx mdrun -deffnm em
+gmx mdrun -nt 28 -v -deffnm em
 gmx grompp -f nvt.mdp -c em.gro -p topol.top -o nvt.tpr
-gmx mdrun -deffnm nvt
+gmx mdrun -v -deffnm nvt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 gmx grompp -f npt.mdp -c nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
-gmx mdrun -deffnm npt
+gmx mdrun -v -deffnm npt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr
-gmx mdrun -deffnm md
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 ```
 
 ## Helper Commands
@@ -306,6 +306,28 @@ watch -n 10 'tail -20 md.log'
 |----------|---------|---------|
 | **Workstation** | `gmx_mpi` | `gmx_mpi grompp -f md.mdp ...` |
 | **Swarm** | `gmx` | `gmx mdrun -deffnm md` |
+
+### Swarm-Specific mdrun Command Formats
+
+**CRITICAL**: Use these exact formats on swarm to avoid errors.
+
+**Energy Minimization (EM):**
+```bash
+gmx mdrun -nt 28 -v -deffnm em
+```
+- **ALWAYS** use `-nt 28 -v -deffnm` format
+- **NO GPU FLAGS** (will cause errors)
+- Simple CPU-only minimization
+
+**NVT/NPT Equilibration and Production MD:**
+```bash
+gmx mdrun -v -deffnm nvt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
+gmx mdrun -v -deffnm npt -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
+gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
+```
+- **ALWAYS** use: `-nb gpu -bonded cpu -update gpu -ntomp 16 -pin on`
+- **NEVER** use: `-pme gpu` (causes issues on swarm)
+- **NEVER** use: `-ntmpi` (not needed with SLURM)
 
 ### Time Limits
 
