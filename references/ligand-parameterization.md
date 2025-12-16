@@ -2,21 +2,18 @@
 
 Guide for generating GROMACS-compatible topology files for small molecules and ligands.
 
-## Quick Start with ligand_setup.py
+## Quick Start with Automated Scripts
 
-The repository includes an automated script for ligand parameterization:
+The repository includes two automated scripts for ligand parameterization:
+
+### Option 1: From Compound Name (ligand_setup.py)
 
 ```bash
-# Basic usage
+# Basic usage - fetch from PubChem
 python scripts/ligand_setup.py --name "hexane" --resname HEX
 
 # Custom base name
 python scripts/ligand_setup.py --name "benzene" --base benzene --resname BNZ
-
-# Output:
-# - HEX.acpype/HEX_GMX.itp      # Topology
-# - HEX.acpype/HEX_GMX.gro      # Coordinates
-# - HEX.acpype/atomtypes.itp    # Atomtypes (separate)
 ```
 
 **What it does:**
@@ -24,6 +21,46 @@ python scripts/ligand_setup.py --name "benzene" --base benzene --resname BNZ
 2. Generates 3D coordinates with RDKit
 3. Runs ACPYPE to generate GAFF parameters
 4. Post-processes to extract atomtypes and normalize residue names
+
+### Option 2: From SMILES String (solvent_to_gmx.py)
+
+```bash
+# Simple molecule
+python scripts/solvent_to_gmx.py --smiles "CCCCCC" --resname HEX --base hexane
+
+# Complex molecule with charges
+python scripts/solvent_to_gmx.py \
+  --smiles "O=C([O-])C1=C(O)C(/N=N/C2=CC=C(C)C=C2S(=O)([O-])=O)=C3C=CC=CC3=C1" \
+  --resname DYE --base azo_dye
+
+# Ethanol
+python scripts/solvent_to_gmx.py --smiles "CCO" --resname ETH --base ethanol
+
+# Ionic liquid
+python scripts/solvent_to_gmx.py --smiles "C[N+](C)(C)CCCC[N+](C)(C)C" --resname ILQ --base ionic_liquid
+```
+
+**What it does:**
+1. Parses SMILES string
+2. Generates 3D coordinates with RDKit (with multiple retry attempts)
+3. Detects net charge automatically
+4. Runs ACPYPE to generate GAFF parameters
+5. Post-processes to extract atomtypes and normalize residue names
+
+**When to use SMILES approach:**
+- Custom solvents not in PubChem
+- Specific protonation states
+- Modified molecules
+- Quick testing with simple SMILES
+
+### Output Structure (Both Scripts)
+
+```
+# Output:
+# - HEX.acpype/HEX_GMX.itp      # Topology
+# - HEX.acpype/HEX_GMX.gro      # Coordinates
+# - HEX.acpype/atomtypes.itp    # Atomtypes (separate)
+```
 
 ### Requirements
 

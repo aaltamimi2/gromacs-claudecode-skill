@@ -35,8 +35,16 @@ gmx genion -s ions.tpr -o system.gro -p topol.top -pname NA -nname CL -neutral
 
 #### Ligand/Small Molecule Parameterization
 ```bash
-# Automated parameterization from compound name
+# Option 1: From compound name (PubChem lookup)
 python scripts/ligand_setup.py --name "hexane" --resname HEX
+
+# Option 2: From SMILES string
+python scripts/solvent_to_gmx.py --smiles "CCCCCC" --resname HEX --base hexane
+
+# Option 3: Complex molecules from SMILES
+python scripts/solvent_to_gmx.py \
+  --smiles "O=C([O-])C1=C(O)C(/N=N/C2=CC=C(C)C=C2S(=O)([O-])=O)=C3C=CC=CC3=C1" \
+  --resname DYE --base dye_molecule
 
 # Outputs:
 # - HEX.acpype/HEX_GMX.itp (topology)
@@ -120,7 +128,8 @@ Unless specified otherwise, use:
 
 ## Utility Scripts
 
-- **scripts/ligand_setup.py**: Automated ligand parameterization (PubChem → RDKit → ACPYPE)
+- **scripts/ligand_setup.py**: Automated ligand parameterization from compound name (PubChem → RDKit → ACPYPE)
+- **scripts/solvent_to_gmx.py**: Convert SMILES to GROMACS topology (SMILES → RDKit → ACPYPE)
 - **scripts/check_equilibration.py**: Validate NVT/NPT equilibration quality
 - **scripts/gmx_wrapper.sh**: Auto-detect gmx_mpi vs gmx
 
