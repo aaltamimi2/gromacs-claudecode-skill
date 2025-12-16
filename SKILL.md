@@ -195,6 +195,7 @@ For detailed information, see:
 | NaN in energy | Unstable simulation | Reduce dt, check parameters |
 | Density too low/high | Wrong pressure coupling | Check barostat settings, ref_p |
 | Temperature drift | Thermostat misconfigured | Check tc-grps match index |
+| Atom count mismatch | Topology molecule count ≠ .gro | Check if diff = atoms/molecule, fix [ molecules ] |
 | PLUMED symbol error | PLUMED library not loaded | Set LD_LIBRARY_PATH or use gmx |
 
 See [references/troubleshooting.md](references/troubleshooting.md) and [references/mpi-configuration.md](references/mpi-configuration.md) for detailed diagnostics.
