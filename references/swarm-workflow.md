@@ -13,7 +13,7 @@ Guide for preparing GROMACS simulations on workstation and submitting to swarm c
 - **GROMACS command**: `gmx`
 - **Purpose**: Production MD runs
 - **SLURM**: Use job scheduler
-- **Access**: `ssh aaltamimi2@swarm.che.wisc.edu`
+- **Access**: `ssh swarm` (SSH config alias for aaltamimi2@swarm.che.wisc.edu)
 
 ## Standard Workflow
 
@@ -75,21 +75,21 @@ gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 
 ```bash
 # Create project directory on swarm
-ssh aaltamimi2@swarm.che.wisc.edu "mkdir -p ~/projects/my_simulation"
+ssh swarm "mkdir -p ~/projects/my_simulation"
 
 # Transfer input files
 scp system.gro topol.top *.mdp *.itp submit_swarm.sh \
-    aaltamimi2@swarm.che.wisc.edu:~/projects/my_simulation/
+    swarm:~/projects/my_simulation/
 
 # If using ligands, transfer ACPYPE outputs
-scp -r LIG.acpype aaltamimi2@swarm.che.wisc.edu:~/projects/my_simulation/
+scp -r LIG.acpype swarm:~/projects/my_simulation/
 ```
 
 ### Step 4: Submit Job on Swarm
 
 ```bash
 # SSH to swarm
-ssh aaltamimi2@swarm.che.wisc.edu
+ssh swarm
 
 # Navigate to project
 cd ~/projects/my_simulation
@@ -108,9 +108,9 @@ tail -f slurm-*.out
 
 ```bash
 # From workstation, download results
-scp -r aaltamimi2@swarm.che.wisc.edu:~/projects/my_simulation/*.xtc .
-scp -r aaltamimi2@swarm.che.wisc.edu:~/projects/my_simulation/*.edr .
-scp -r aaltamimi2@swarm.che.wisc.edu:~/projects/my_simulation/*.log .
+scp swarm:~/projects/my_simulation/*.xtc .
+scp swarm:~/projects/my_simulation/*.edr .
+scp swarm:~/projects/my_simulation/*.log .
 ```
 
 ## SLURM Job Templates
@@ -225,8 +225,19 @@ gmx mdrun -v -deffnm md -nb gpu -bonded cpu -update gpu -ntomp 16 -pin on
 ssh-keygen -t rsa -b 4096
 
 # Copy to swarm for passwordless login
-ssh-copy-id aaltamimi2@swarm.che.wisc.edu
+ssh-copy-id swarm
 ```
+
+**SSH Config Setup (Recommended):**
+
+Add to `~/.ssh/config` on workstation:
+```
+Host swarm
+    HostName swarm.che.wisc.edu
+    User aaltamimi2
+```
+
+This allows using `ssh swarm` instead of `ssh aaltamimi2@swarm.che.wisc.edu`
 
 ### Quick Transfer Script
 
@@ -245,16 +256,15 @@ fi
 SWARM_DIR="~/projects/${PROJECT_NAME}"
 
 # Create directory on swarm
-ssh aaltamimi2@swarm.che.wisc.edu "mkdir -p $SWARM_DIR"
+ssh swarm "mkdir -p $SWARM_DIR"
 
 # Transfer all necessary files
-scp *.gro *.top *.mdp *.itp submit_swarm.sh \
-    aaltamimi2@swarm.che.wisc.edu:$SWARM_DIR/
+scp *.gro *.top *.mdp *.itp submit_swarm.sh swarm:$SWARM_DIR/
 
 # Transfer ligand directories if they exist
 for dir in *.acpype; do
     if [[ -d "$dir" ]]; then
-        scp -r "$dir" aaltamimi2@swarm.che.wisc.edu:$SWARM_DIR/
+        scp -r "$dir" swarm:$SWARM_DIR/
     fi
 done
 
@@ -358,7 +368,7 @@ project_directory/
 
 ```bash
 # Test connection
-ssh -v aaltamimi2@swarm.che.wisc.edu
+ssh -v swarm
 
 # Check VPN if off-campus
 # University of Wisconsin VPN required
@@ -380,7 +390,7 @@ which gmx
 
 ```bash
 # Verify transfer
-ssh aaltamimi2@swarm.che.wisc.edu "ls -la ~/projects/my_simulation"
+ssh swarm "ls -la ~/projects/my_simulation"
 
 # Check paths in job script
 # All paths should be relative or explicit
