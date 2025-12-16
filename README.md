@@ -34,19 +34,23 @@ Once registered, you can invoke the skill by asking Claude for GROMACS-related t
 - **Free Energy**: Umbrella sampling, FEP, PMF calculations
 - **Troubleshooting**: Solutions for LINCS, exploding systems, NaN errors, MPI issues
 
-## MPI Configuration
+## GROMACS Configuration
 
-If you have `gmx_mpi` (MPI-enabled GROMACS), you need to use `mpirun`:
+This skill supports both `gmx_mpi` (preferred) and `gmx` (fallback).
 
+**Workstation usage** - Run directly without mpirun:
 ```bash
-# Single process
-mpirun -np 1 gmx_mpi pdb2gmx -f input.pdb -o output.gro
-
-# Multiple processes
-mpirun -np 16 gmx_mpi mdrun -deffnm production
+gmx_mpi pdb2gmx -f input.pdb -o output.gro
+gmx_mpi mdrun -deffnm production
 ```
 
-See `references/mpi-configuration.md` for detailed MPI setup.
+**HPC cluster usage** - Use job scheduler launcher:
+```bash
+srun gmx_mpi mdrun -deffnm production
+# or: mpirun -np 16 gmx_mpi mdrun -deffnm production
+```
+
+See `references/mpi-configuration.md` for detailed configuration and PLUMED troubleshooting.
 
 ### Using the Wrapper Script
 
@@ -85,19 +89,19 @@ gromacs-claudecode-skill/
 
 ```bash
 # 1. Generate topology
-mpirun -np 1 gmx_mpi pdb2gmx -f protein.pdb -o processed.gro -ff amber99sb-ildn
+gmx_mpi pdb2gmx -f protein.pdb -o processed.gro -ff amber99sb-ildn
 
 # 2. Create box and solvate
-mpirun -np 1 gmx_mpi editconf -f processed.gro -o boxed.gro -c -d 1.2
-mpirun -np 1 gmx_mpi solvate -cp boxed.gro -o solvated.gro -p topol.top
+gmx_mpi editconf -f processed.gro -o boxed.gro -c -d 1.2
+gmx_mpi solvate -cp boxed.gro -o solvated.gro -p topol.top
 
 # 3. Energy minimization
-mpirun -np 1 gmx_mpi grompp -f em.mdp -c solvated.gro -p topol.top -o em.tpr
-mpirun -np 1 gmx_mpi mdrun -deffnm em
+gmx_mpi grompp -f em.mdp -c solvated.gro -p topol.top -o em.tpr
+gmx_mpi mdrun -deffnm em
 
 # 4. NVT equilibration
-mpirun -np 1 gmx_mpi grompp -f nvt.mdp -c em.gro -p topol.top -o nvt.tpr
-mpirun -np 1 gmx_mpi mdrun -deffnm nvt
+gmx_mpi grompp -f nvt.mdp -c em.gro -p topol.top -o nvt.tpr
+gmx_mpi mdrun -deffnm nvt
 
 # 5. Check equilibration
 python scripts/check_equilibration.py nvt.edr
@@ -108,7 +112,12 @@ python scripts/check_equilibration.py nvt.edr
 ### MPI write_line error
 **Error**: `write_line error; fd=-1 buf=:cmd=abort exitcode=1`
 
-**Solution**: Use `mpirun -np 1 gmx_mpi` instead of `gmx_mpi` directly
+**Solution**: Rare MPI configuration issue - try using `gmx` instead of `gmx_mpi`
+
+### PLUMED symbol error
+**Error**: `gmx_mpi: symbol lookup error: undefined symbol: plumed_hrex`
+
+**Solution**: Load PLUMED library - `export LD_LIBRARY_PATH=/path/to/plumed/lib:$LD_LIBRARY_PATH`
 
 ### LINCS warnings
 **Error**: `LINCS WARNING relative constraint deviation`
