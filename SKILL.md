@@ -130,12 +130,14 @@ Unless specified otherwise, use:
 
 - **scripts/ligand_setup.py**: Automated ligand parameterization from compound name (PubChem → RDKit → ACPYPE)
 - **scripts/solvent_to_gmx.py**: Convert SMILES to GROMACS topology (SMILES → RDKit → ACPYPE)
+- **scripts/generate_swarm_job.sh**: Generate SLURM job scripts for swarm cluster
 - **scripts/check_equilibration.py**: Validate NVT/NPT equilibration quality
 - **scripts/gmx_wrapper.sh**: Auto-detect gmx_mpi vs gmx
 
 ## Reference Files
 
 For detailed information, see:
+- **[references/swarm-workflow.md](references/swarm-workflow.md)**: Workstation preparation + swarm cluster submission workflow
 - **[references/ligand-parameterization.md](references/ligand-parameterization.md)**: Ligand topology generation, ACPYPE, CGenFF, ATB
 - **[references/mdp-templates.md](references/mdp-templates.md)**: Complete .mdp examples for EM, NVT, NPT, production, and specialized runs
 - **[references/free-energy.md](references/free-energy.md)**: Umbrella sampling, steered MD, PMF calculations, FEP
@@ -156,4 +158,4 @@ For detailed information, see:
 
 See [references/troubleshooting.md](references/troubleshooting.md) and [references/mpi-configuration.md](references/mpi-configuration.md) for detailed diagnostics.
 
-**Note**: Examples use `gmx` for simplicity. Prefer `gmx_mpi` when available (see mpi-configuration.md).
+**Note**: Examples use `gmx` for simplicity. On workstation, use `gmx_mpi`. On swarm cluster, use `gmx` (see swarm-workflow.md and mpi-configuration.md).
