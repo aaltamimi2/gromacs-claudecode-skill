@@ -237,6 +237,83 @@ grep "\[ atoms \]" -A 20 topol.top
 gmx genion -s ions.tpr -o system.gro -p topol.top -pname NA -nname CL -neutral
 ```
 
+### "Atom count mismatch between coordinate and topology files"
+**Symptom:**
+```
+Fatal error: number of coordinates in coordinate file does not match topology
+.gro file has X atoms but topology expects Y atoms
+```
+
+**Common Cause:** The topology file lists the wrong number of molecules (often off by ±1 molecule).
+
+**Diagnostic Steps:**
+
+1. **Calculate the atom difference:**
+   ```bash
+   # From grompp output: X atoms in .gro, Y in topology
+   # Difference = X - Y (e.g., 786577 - 786515 = 62 atoms)
+   ```
+
+2. **Check if difference matches whole molecules:**
+   ```bash
+   # Count atoms per molecule type from your .gro or topology
+   grep "CTAB" ctab-topol.top -A 5 | grep -E "^\s*\[.*atoms.*\]" -A 100 | wc -l
+   # Or count from .gro: atoms in one molecule = total_atoms / num_molecules
+   ```
+
+3. **Identify the culprit molecule:**
+   - If difference = 62 atoms and CTAB has 62 atoms → off by 1 CTAB molecule
+   - If difference = 3 atoms and water has 3 atoms → off by 1 SOL molecule
+   - Negative difference means topology has MORE molecules than coordinate file
+   - Positive difference means topology has FEWER molecules than coordinate file
+
+4. **Verify actual molecule count in .gro:**
+   ```bash
+   # Count specific residues in .gro file
+   grep "CTAB" system.gro | wc -l     # Atoms of CTAB
+   grep "SOL" system.gro | wc -l      # Water molecules (each SOL = 3 atoms for 3-point water)
+
+   # For multi-atom molecules, divide by atoms per molecule
+   # Example: 6262 CTAB atoms / 62 atoms per molecule = 101 molecules
+   ```
+
+5. **Compare with topology file:**
+   ```bash
+   # Check [ molecules ] section
+   tail -20 topol.top
+   # Should show:
+   # CTAB    100   ← This should be 101 if .gro has 101
+   # SOL     25000
+   ```
+
+**Solutions:**
+
+**Fix the topology [ molecules ] section:**
+```bash
+# Edit topology to match actual .gro content
+# If .gro has 101 CTAB but topology says 100:
+sed -i 's/^CTAB.*100/CTAB    101/' topol.top
+
+# Or manually edit the [ molecules ] section:
+nano topol.top
+# Change the count to match your .gro file
+```
+
+**Re-count molecules in .gro to update topology:**
+```bash
+# For exact counts, use:
+awk '/CTAB/{count++} END{print "CTAB molecules:", count/62}' system.gro
+# Replace 62 with atoms per CTAB molecule
+
+# For water (3 atoms per molecule):
+awk '/SOL/{count++} END{print "SOL molecules:", count/3}' system.gro
+```
+
+**Prevention:**
+- Always verify molecule counts after `gmx insert-molecules`, `gmx solvate`, or `gmx genion`
+- These tools usually update topology automatically, but manual edits can cause mismatches
+- Double-check after copying/modifying .gro files without updating topology
+
 ## Performance Issues
 
 ### Slow simulation

@@ -1,6 +1,6 @@
 ---
 name: gromacs
-description: "Create, run, and analyze molecular dynamics simulations using GROMACS. Use this skill when the user asks for: (1) System setup and topology preparation, (2) .mdp parameter file design, (3) Simulation workflows (EM → NVT → NPT → production), (4) HPC job scripts and performance tuning, (5) Trajectory analysis (energy, density, MSD, SASA, RDF), (6) Free energy calculations (umbrella sampling, FEP, PMF), (7) Troubleshooting simulation failures (LINCS, exploding systems, barostat instability)."
+description: "Create, run, and analyze molecular dynamics simulations using GROMACS. Use this skill when the user asks for: (1) System setup and topology preparation, (2) Ligand parameterization and small molecule setup, (3) .mdp parameter file design, (4) Simulation workflows (EM → NVT → NPT → production), (5) HPC job scripts and performance tuning, (6) Trajectory analysis (energy, density, MSD, SASA, RDF), (7) Free energy calculations (umbrella sampling, FEP, PMF), (8) Troubleshooting simulation failures (LINCS, exploding systems, barostat instability, PLUMED errors)."
 ---
 
 # GROMACS Molecular Dynamics Skill
@@ -18,17 +18,75 @@ Before writing commands, identify:
 ## Standard Workflow
 
 ### 1. System Preparation
+
+#### Protein Systems
 ```bash
 # Generate topology (example for protein)
 gmx pdb2gmx -f input.pdb -o processed.gro -water tip3p -ff charmm27
 
 # Define box and solvate
 gmx editconf -f processed.gro -o boxed.gro -c -d 1.2 -bt dodecahedron
+
+# Add WATER using gmx solvate (for SPC, TIP3P, TIP4P water models)
 gmx solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
 
 # Add ions to neutralize
 gmx grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr
 gmx genion -s ions.tpr -o system.gro -p topol.top -pname NA -nname CL -neutral
+```
+
+**Note**: Use `gmx solvate` for water, `gmx insert-molecules` for all other solvents (see below).
+
+#### Ligand/Small Molecule Parameterization
+```bash
+# Option 1: From compound name (PubChem lookup)
+python scripts/ligand_setup.py --name "hexane" --resname HEX
+
+# Option 2: From SMILES string
+python scripts/solvent_to_gmx.py --smiles "CCCCCC" --resname HEX --base hexane
+
+# Option 3: Complex molecules from SMILES
+python scripts/solvent_to_gmx.py \
+  --smiles "O=C([O-])C1=C(O)C(/N=N/C2=CC=C(C)C=C2S(=O)([O-])=O)=C3C=CC=CC3=C1" \
+  --resname DYE --base dye_molecule
+
+# Outputs:
+# - HEX.acpype/HEX_GMX.itp (topology)
+# - HEX.acpype/HEX_GMX.gro (structure)
+# - HEX.acpype/atomtypes.itp (force field parameters)
+
+# Include in topology:
+# #include "HEX.acpype/atomtypes.itp"
+# #include "HEX.acpype/HEX_GMX.itp"
+```
+
+See [references/ligand-parameterization.md](references/ligand-parameterization.md) for detailed ligand setup.
+
+#### Solvation Guide
+
+**Use `gmx solvate` for WATER:**
+```bash
+# Standard water solvation (SPC, TIP3P, TIP4P models)
+gmx solvate -cp protein.gro -cs spc216.gro -o solvated.gro -p topol.top
+
+# With custom box
+gmx solvate -cp protein.gro -cs spc216.gro -box 8 8 8 -o solvated.gro -p topol.top
+
+# Add water shell around protein
+gmx solvate -cp protein.gro -cs spc216.gro -shell 1.0 -o solvated.gro -p topol.top
+```
+
+**Use `gmx insert-molecules` for NON-WATER solvents:**
+```bash
+# Add organic solvent (e.g., ethanol, DMSO, ionic liquids)
+gmx insert-molecules -f protein.gro -ci ethanol.gro -nmol 500 -o solvated.gro
+
+# Create pure solvent box
+gmx insert-molecules -ci hexane.gro -nmol 100 -box 5 5 5 -o hexane_box.gro
+
+# Mixed solvents (water + organic)
+gmx solvate -cp protein.gro -cs spc216.gro -o water_solvated.gro -p topol.top
+gmx insert-molecules -f water_solvated.gro -ci dmso.gro -nmol 50 -o mixed_solvent.gro
 ```
 
 ### 2. Energy Minimization
@@ -90,6 +148,15 @@ Key flags:
 | `gmx rdf` | Radial distribution functions | `-ref`, `-sel` groups |
 | `gmx trjconv` | Trajectory processing/PBC fixing | `-pbc mol`, `-center`, `-fit` |
 
+### Solvation Tools
+
+| Tool | Use Case | Example |
+|------|----------|---------|
+| `gmx solvate` | **Water only** (SPC, TIP3P, TIP4P) | `gmx solvate -cp protein.gro -cs spc216.gro -o solvated.gro -p topol.top` |
+| `gmx insert-molecules` | **All non-water solvents** (organic, ionic liquids, etc.) | `gmx insert-molecules -f protein.gro -ci ethanol.gro -nmol 500 -o solvated.gro` |
+
+**Key difference**: `gmx solvate` intelligently fills space and updates topology; `gmx insert-molecules` randomly inserts molecules.
+
 ## Default Parameters
 
 Unless specified otherwise, use:
@@ -99,14 +166,25 @@ Unless specified otherwise, use:
 - **Constraints**: `h-bonds` with LINCS (or `all-bonds` if needed)
 - **Time step**: 2 fs (with h-bond constraints), 1 fs (unconstrained)
 
+## Utility Scripts
+
+- **scripts/ligand_setup.py**: Automated ligand parameterization from compound name (PubChem → RDKit → ACPYPE)
+- **scripts/solvent_to_gmx.py**: Convert SMILES to GROMACS topology (SMILES → RDKit → ACPYPE)
+- **scripts/generate_swarm_job.sh**: Generate SLURM job scripts for swarm cluster
+- **scripts/check_equilibration.py**: Validate NVT/NPT equilibration quality
+- **scripts/gmx_wrapper.sh**: Auto-detect gmx_mpi vs gmx
+
 ## Reference Files
 
 For detailed information, see:
+- **[references/swarm-workflow.md](references/swarm-workflow.md)**: Workstation preparation + swarm cluster submission workflow
+- **[references/ligand-parameterization.md](references/ligand-parameterization.md)**: Ligand topology generation, ACPYPE, CGenFF, ATB
 - **[references/mdp-templates.md](references/mdp-templates.md)**: Complete .mdp examples for EM, NVT, NPT, production, and specialized runs
 - **[references/free-energy.md](references/free-energy.md)**: Umbrella sampling, steered MD, PMF calculations, FEP
 - **[references/troubleshooting.md](references/troubleshooting.md)**: Common errors (LINCS, exploding systems, NaN) and fixes
-- **[references/hpc-scripts.md](references/hpc-scripts.md)**: SLURM job templates for CPU/GPU clusters
 - **[references/mpi-configuration.md](references/mpi-configuration.md)**: gmx vs gmx_mpi setup, PLUMED issues
+
+**Note**: Create cluster-specific workflow files (like swarm-workflow.md) for each HPC resource you use, as requirements vary significantly between clusters.
 
 ## Quick Troubleshooting
 
@@ -117,8 +195,9 @@ For detailed information, see:
 | NaN in energy | Unstable simulation | Reduce dt, check parameters |
 | Density too low/high | Wrong pressure coupling | Check barostat settings, ref_p |
 | Temperature drift | Thermostat misconfigured | Check tc-grps match index |
+| Atom count mismatch | Topology molecule count ≠ .gro | Check if diff = atoms/molecule, fix [ molecules ] |
 | PLUMED symbol error | PLUMED library not loaded | Set LD_LIBRARY_PATH or use gmx |
 
 See [references/troubleshooting.md](references/troubleshooting.md) and [references/mpi-configuration.md](references/mpi-configuration.md) for detailed diagnostics.
 
-**Note**: Examples use `gmx` for simplicity. Prefer `gmx_mpi` when available (see mpi-configuration.md).
+**Note**: Examples use `gmx` for simplicity. On workstation, use `gmx_mpi`. On swarm cluster, use `gmx` (see swarm-workflow.md and mpi-configuration.md).
