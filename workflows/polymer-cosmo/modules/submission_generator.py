@@ -163,6 +163,44 @@ echo "NPT Quality Check:"
 echo "Temperature" | gmx energy -f npt.edr -o npt_temp.xvg 2>&1 | grep "Average"
 echo "Pressure" | gmx energy -f npt.edr -o npt_press.xvg 2>&1 | grep "Average"
 echo "Density" | gmx energy -f npt.edr -o npt_density.xvg 2>&1 | grep "Average"
+
+# Extract polymer-only trajectory for conformational sampling
+echo ""
+echo "=========================================="
+echo "Extracting Polymer-Only Trajectory"
+echo "=========================================="
+echo ""
+echo "⚠️  IMPORTANT: For conformational sampling, only the polymer should be used!"
+echo ""
+
+# Create index file to select polymer group
+gmx make_ndx -f npt.gro -o index.ndx <<EOF
+q
+EOF
+
+echo "Available groups in index.ndx:"
+tail -20 index.ndx
+
+echo ""
+echo "Extracting polymer trajectory..."
+echo "  (Using group 1 for polymer - verify this matches your system!)"
+echo ""
+
+# Extract polymer-only trajectory
+# Group 1 is typically the first molecule type (polymer)
+# User should verify this is correct for their system
+echo 1 | gmx trjconv -f npt.xtc -s npt.tpr -n index.ndx -o polymer_only.xtc
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "✓ Created polymer_only.xtc for conformational sampling"
+    echo ""
+    echo "  Use this command for sampling:"
+    echo "  python conformational_sampling.py polymer_only.xtc npt.gro --grid-size 10 --plot"
+    echo ""
+else
+    echo "WARNING: Polymer extraction failed - check group selection"
+fi
 """
 
         # Completion message

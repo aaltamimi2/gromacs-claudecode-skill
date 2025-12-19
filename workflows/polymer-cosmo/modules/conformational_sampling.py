@@ -246,29 +246,67 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
     extract_script = output_file.replace('.dat', '_extract.sh')
     print(f"\nGenerating extraction script: {extract_script}")
 
+    # Get timestep for frame-to-time conversion
+    dt_ps = traj.timestep  # Timestep in ps
+
     try:
         with open(extract_script, 'w') as f:
             f.write("#!/bin/bash\n")
             f.write("# Extract selected conformers using gmx trjconv\n")
-            f.write(f"# Generated from: {trajectory}\n\n")
+            f.write(f"# Generated from: {trajectory}\n")
+            f.write(f"# IMPORTANT: Only polymer atoms should be extracted (not solvent!)\n\n")
 
             f.write("TRAJ=\"" + trajectory + "\"\n")
             f.write("TOP=\"" + topology + "\"\n")
-            f.write("OUTDIR=\"conformers\"\n\n")
+            f.write("OUTDIR=\"conformers\"\n")
+            f.write(f"DT_PS={dt_ps:.3f}  # Trajectory timestep in ps\n\n")
 
             f.write("mkdir -p ${OUTDIR}\n\n")
 
-            for i, idx in enumerate(final_indices):
-                f.write(f"# Conformer {i+1}: Frame {idx}\n")
-                f.write(f"echo 0 | gmx trjconv -f ${{TRAJ}} -s ${{TOP}} "
-                       f"-dump {idx} -o ${{OUTDIR}}/conformer_{i+1:03d}_frame{idx}.pdb\n")
+            f.write("# Auto-detect polymer group\n")
+            f.write("# Create index file to find group numbers\n")
+            f.write("echo 'q' | gmx make_ndx -f ${TOP} -o temp_index.ndx > /dev/null 2>&1\n\n")
 
-            f.write("\necho \"✓ Extracted {len(final_indices)} conformers to ${OUTDIR}/\"\n")
+            f.write("echo \"Available groups:\"\n")
+            f.write("tail -20 temp_index.ndx\n")
+            f.write("echo \"\"\n\n")
+
+            f.write("# Detect polymer group (typically group 1, but verify!)\n")
+            f.write("# You can override this by setting POLYMER_GROUP before running\n")
+            f.write("if [ -z \"$POLYMER_GROUP\" ]; then\n")
+            f.write("    POLYMER_GROUP=1  # Default to group 1 (first molecule type)\n")
+            f.write("    echo \"Using default POLYMER_GROUP=1\"\n")
+            f.write("    echo \"If this is incorrect, run: POLYMER_GROUP=N ./" + str(Path(extract_script).name) + "\"\n")
+            f.write("    echo \"\"\n")
+            f.write("fi\n\n")
+
+            f.write("echo \"Extracting conformers using group ${POLYMER_GROUP} (polymer only)...\"\n")
+            f.write("echo \"\"\n\n")
+
+            for i, idx in enumerate(final_indices):
+                # Convert frame to time in ps
+                time_ps = idx * dt_ps
+                f.write(f"# Conformer {i+1}: Frame {idx} (time = {time_ps:.2f} ps)\n")
+                f.write(f"echo ${{POLYMER_GROUP}} | gmx trjconv -f ${{TRAJ}} -s ${{TOP}} -n temp_index.ndx "
+                       f"-dump {time_ps:.2f} -o ${{OUTDIR}}/conformer_{i+1:03d}_frame{idx}.pdb > /dev/null 2>&1\n")
+
+            f.write("\n# Cleanup\n")
+            f.write("rm -f temp_index.ndx\n\n")
+
+            f.write(f"echo \"\"\n")
+            f.write(f"echo \"✓ Extracted {len(final_indices)} conformers to ${{OUTDIR}}/\"\n")
+            f.write(f"echo \"✓ PDB files contain POLYMER ONLY (no solvent)\"\n")
+            f.write(f"echo \"\"\n")
+            f.write(f"echo \"Next steps:\"\n")
+            f.write(f"echo \"  1. Open PDB files in GaussView to create .gjf files\"\n")
+            f.write(f"echo \"  2. Run prepare_gaussian.py to add COSMO-RS commands\"\n")
 
         Path(extract_script).chmod(0o755)
         print(f"✓ Extraction script saved")
         print(f"\nTo extract conformers, run:")
         print(f"  ./{extract_script}")
+        print(f"\nOr specify polymer group:")
+        print(f"  POLYMER_GROUP=1 ./{extract_script}")
 
     except Exception as e:
         print(f"WARNING: Failed to create extraction script: {e}")
