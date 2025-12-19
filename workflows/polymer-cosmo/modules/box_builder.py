@@ -122,54 +122,137 @@ class BoxBuilder:
 
         return boxed_gro
 
-    def add_solvent(self, boxed_gro: Path, n_molecules: int = 15000) -> Path:
+    def _get_atoms_per_molecule(self, gro_file: Path) -> int:
+        """Get number of atoms in a single molecule from .gro file."""
+        with open(gro_file) as f:
+            lines = f.readlines()
+            if len(lines) < 2:
+                return 0
+            try:
+                return int(lines[1].strip())
+            except ValueError:
+                return 0
+
+    def _count_atoms_in_gro(self, gro_file: Path) -> int:
+        """Count total atoms in .gro file."""
+        with open(gro_file) as f:
+            lines = f.readlines()
+            if len(lines) < 2:
+                return 0
+            try:
+                return int(lines[1].strip())
+            except ValueError:
+                return 0
+
+    def add_solvent(self, boxed_gro: Path, n_molecules: int = 15000,
+                    timeout_minutes: float = 2.0) -> Tuple[Path, int]:
         """
-        Add solvent molecules to box.
+        Add solvent molecules to box with intelligent retry logic.
 
         Args:
             boxed_gro: Path to boxed polymer structure
-            n_molecules: Number of solvent molecules to add
+            n_molecules: Target number of solvent molecules to add
+            timeout_minutes: Timeout for insertion attempt (default: 2 min)
 
         Returns:
-            Path to solvated structure
+            Tuple of (Path to solvated structure, actual number of molecules added)
         """
+        import time
+        import signal
+        from contextlib import contextmanager
+
         solvent_gro = self.work_dir / "solvent.acpype" / "solvent_GMX.gro"
         if not solvent_gro.exists():
             raise FileNotFoundError(f"Solvent structure not found: {solvent_gro}")
 
         solvated_gro = self.work_dir / "system_solvated.gro"
 
-        cmd = (
-            f"gmx insert-molecules -f {boxed_gro} -ci {solvent_gro} "
-            f"-nmol {n_molecules} -o {solvated_gro} -try 500"
-        )
+        # Get atoms per solvent molecule
+        atoms_per_solvent = self._get_atoms_per_molecule(solvent_gro)
+        initial_atoms = self._count_atoms_in_gro(boxed_gro)
 
-        returncode, stdout, stderr = self.run_command(
-            cmd,
-            f"Adding {n_molecules} solvent molecules"
-        )
+        print(f"\nSolvent molecule has {atoms_per_solvent} atoms")
+        print(f"Initial system has {initial_atoms} atoms")
 
-        if returncode != 0:
-            # Try with fewer molecules if insertion fails
-            print(f"\nWARNING: Failed to insert {n_molecules} molecules")
-            print("Trying with automatic molecule count...")
+        # Timeout handler
+        @contextmanager
+        def timeout_context(seconds):
+            def timeout_handler(signum, frame):
+                raise TimeoutError()
 
-            # Try without specifying number
-            cmd_auto = (
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(int(seconds))
+            try:
+                yield
+            finally:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+
+        # Iterative insertion with timeout and reduction
+        target = n_molecules
+        max_attempts = 5
+        timeout_sec = int(timeout_minutes * 60)
+
+        for attempt in range(1, max_attempts + 1):
+            print(f"\n--- Attempt {attempt}: Trying to insert {target} molecules ---")
+            print(f"Timeout: {timeout_minutes} minutes, Max tries per molecule: 100")
+
+            cmd = (
                 f"gmx insert-molecules -f {boxed_gro} -ci {solvent_gro} "
-                f"-o {solvated_gro} -try 500"
+                f"-nmol {target} -o {solvated_gro} -try 100"
             )
-            returncode, stdout, stderr = self.run_command(cmd_auto, "Auto solvent insertion")
 
-            if returncode != 0:
-                raise RuntimeError("Solvent insertion failed")
+            try:
+                with timeout_context(timeout_sec):
+                    returncode, stdout, stderr = self.run_command(
+                        cmd,
+                        f"Adding {target} solvent molecules (attempt {attempt})"
+                    )
 
-        # Count actual molecules inserted
-        actual_count = self._count_molecules_in_gro(solvated_gro)
-        print(f"\n✓ Successfully inserted solvent molecules")
-        print(f"  Requested: {n_molecules}, Actual: {actual_count}")
+                    if returncode == 0:
+                        # Success! Count molecules
+                        final_atoms = self._count_atoms_in_gro(solvated_gro)
+                        added_atoms = final_atoms - initial_atoms
+                        actual_molecules = added_atoms // atoms_per_solvent
 
-        return solvated_gro
+                        print(f"\n✓ Successfully inserted solvent molecules")
+                        print(f"  Target: {target}")
+                        print(f"  Actual molecules added: {actual_molecules}")
+                        print(f"  Total atoms: {final_atoms}")
+                        print(f"  Fill efficiency: {actual_molecules/target*100:.1f}%")
+
+                        return solvated_gro, actual_molecules
+
+            except TimeoutError:
+                print(f"\n⏱ Timeout after {timeout_minutes} minutes")
+
+                # Check if any molecules were added
+                if solvated_gro.exists():
+                    final_atoms = self._count_atoms_in_gro(solvated_gro)
+                    added_atoms = final_atoms - initial_atoms
+                    actual_molecules = added_atoms // atoms_per_solvent
+
+                    if actual_molecules > 0:
+                        print(f"  Partial success: {actual_molecules} molecules added so far")
+
+                        # If we got >80% of target, accept it
+                        if actual_molecules / target > 0.8:
+                            print(f"  ✓ Accepting {actual_molecules} molecules (>80% of target)")
+                            return solvated_gro, actual_molecules
+
+            except Exception as e:
+                print(f"\n✗ Error during insertion: {e}")
+
+            # Reduce target for next attempt
+            target = int(target * 0.7)
+            print(f"  → Reducing target to {target} molecules for next attempt")
+
+            if target < 100:
+                print(f"\n✗ Target too low ({target} < 100). Stopping.")
+                break
+
+        # If we get here, all attempts failed
+        raise RuntimeError(f"Failed to insert solvent after {max_attempts} attempts")
 
     def _count_molecules_in_gro(self, gro_file: Path) -> int:
         """Count number of molecules in .gro file."""
@@ -183,10 +266,80 @@ class BoxBuilder:
             except ValueError:
                 return 0
 
+    def _merge_atomtypes(self, polymer_atomtypes: Path, solvent_atomtypes: Path) -> Path:
+        """
+        Merge atomtypes from polymer and solvent, removing duplicates.
+
+        Args:
+            polymer_atomtypes: Path to polymer atomtypes.itp
+            solvent_atomtypes: Path to solvent atomtypes.itp
+
+        Returns:
+            Path to merged atomtypes file
+        """
+        merged_file = self.work_dir / "atomtypes.itp"
+
+        # Read atomtypes from both files
+        atomtypes = {}  # Dictionary to track unique atomtypes
+
+        def parse_atomtypes(file_path):
+            """Parse atomtypes from file."""
+            types = {}
+            in_atomtypes = False
+
+            with open(file_path) as f:
+                for line in f:
+                    stripped = line.strip()
+
+                    if stripped.startswith('[') and 'atomtypes' in stripped:
+                        in_atomtypes = True
+                        continue
+
+                    if in_atomtypes:
+                        # Stop at next section
+                        if stripped.startswith('['):
+                            break
+
+                        # Skip comments and empty lines
+                        if not stripped or stripped.startswith(';'):
+                            continue
+
+                        # Parse atomtype line
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            atomtype_name = parts[0]
+                            types[atomtype_name] = line.rstrip()
+
+            return types
+
+        # Parse both files
+        atomtypes.update(parse_atomtypes(polymer_atomtypes))
+        atomtypes.update(parse_atomtypes(solvent_atomtypes))
+
+        # Write merged atomtypes with [ defaults ] section
+        with open(merged_file, 'w') as f:
+            # Add defaults section (required for forcefield)
+            f.write("; Combined atomtypes for polymer-solvent system\n")
+            f.write("; Generated by polymer-cosmo workflow\n\n")
+            f.write("[ defaults ]\n")
+            f.write("; nbfunc\tcomb-rule\tgen-pairs\tfudgeLJ\tfudgeQQ\n")
+            f.write("1\t2\tyes\t1.000000\t1.000000\n\n")
+
+            # Add atomtypes section
+            f.write("[ atomtypes ]\n")
+            f.write(";name   bond_type     mass     charge   ptype   sigma         epsilon       Amb\n")
+
+            # Write unique atomtypes sorted by name
+            for atomtype_name in sorted(atomtypes.keys()):
+                f.write(atomtypes[atomtype_name] + '\n')
+
+        print(f"\n✓ Merged {len(atomtypes)} unique atomtypes into {merged_file.name}")
+        return merged_file
+
     def create_topology(self, polymer_resname: str, solvent_resname: str,
                         n_solvent: int) -> Path:
         """
-        Create combined topology file.
+        Create combined topology file with merged atomtypes.
 
         Args:
             polymer_resname: Polymer residue name
@@ -204,6 +357,9 @@ class BoxBuilder:
         solvent_atomtypes = self.work_dir / "solvent.acpype" / "atomtypes.itp"
         solvent_itp = self.work_dir / "solvent.acpype" / f"solvent_GMX.itp"
 
+        # Merge atomtypes
+        merged_atomtypes = self._merge_atomtypes(polymer_atomtypes, solvent_atomtypes)
+
         # Check if we need to rename residues in itp files
         polymer_resname_actual = self._get_resname_from_itp(polymer_itp)
         solvent_resname_actual = self._get_resname_from_itp(solvent_itp)
@@ -211,19 +367,14 @@ class BoxBuilder:
         topology_content = f"""; Topology for polymer-solvent system
 ; Generated by polymer-cosmo workflow
 
-#include "amber99sb-ildn.ff/forcefield.itp"
-
-; Polymer atom types
-#include "{polymer_atomtypes.name}"
-
-; Solvent atom types
-#include "{solvent_atomtypes.name}"
+; Merged atom types (includes [ defaults ])
+#include "{merged_atomtypes.name}"
 
 ; Polymer topology
-#include "{polymer_itp.name}"
+#include "polymer.acpype/polymer_GMX.itp"
 
 ; Solvent topology
-#include "{solvent_itp.name}"
+#include "solvent.acpype/solvent_GMX.itp"
 
 ; System definition
 [ system ]
@@ -238,6 +389,8 @@ Polymer in solvent
             f.write(topology_content)
 
         print(f"\n✓ Created topology file: {topol_file}")
+        print(f"  Polymer: {polymer_resname_actual} (1 molecule)")
+        print(f"  Solvent: {solvent_resname_actual} ({n_solvent} molecules)")
         return topol_file
 
     def _get_resname_from_itp(self, itp_file: Path) -> str:
@@ -347,13 +500,7 @@ def main():
         print("\n" + "=" * 60)
         print("STEP 4: Adding solvent molecules")
         print("=" * 60)
-        solvated_gro = builder.add_solvent(boxed_gro, args.n_solvent)
-
-        # Get actual solvent count
-        with open(solvated_gro) as f:
-            lines = f.readlines()
-        # Rough count - need to subtract polymer atoms
-        # This is a simplification
+        solvated_gro, actual_n_solvent = builder.add_solvent(boxed_gro, args.n_solvent)
 
         # Create topology
         print("\n" + "=" * 60)
@@ -362,7 +509,7 @@ def main():
         topol = builder.create_topology(
             args.polymer_resname,
             args.solvent_resname,
-            args.n_solvent  # Use requested count for now
+            actual_n_solvent  # Use actual count from insertion
         )
 
         # Test EM if mdp provided

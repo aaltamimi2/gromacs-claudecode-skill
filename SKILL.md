@@ -1,6 +1,6 @@
 ---
 name: gromacs
-description: "Create, run, and analyze molecular dynamics simulations using GROMACS. Use this skill when the user asks for: (1) System setup and topology preparation, (2) Ligand parameterization and small molecule setup, (3) .mdp parameter file design, (4) Simulation workflows (EM → NVT → NPT → production), (5) HPC job scripts and performance tuning, (6) Trajectory analysis (energy, density, MSD, SASA, RDF), (7) Free energy calculations (umbrella sampling, FEP, PMF), (8) Troubleshooting simulation failures (LINCS, exploding systems, barostat instability, PLUMED errors)."
+description: "Create, run, and analyze molecular dynamics simulations using GROMACS. Use this skill when the user asks for: (1) System setup and topology preparation, (2) Ligand parameterization and small molecule setup, (3) .mdp parameter file design, (4) Simulation workflows (EM → NVT → NPT → production), (5) HPC job scripts and performance tuning, (6) Trajectory analysis (energy, density, MSD, SASA, RDF), (7) Free energy calculations (umbrella sampling, FEP, PMF), (8) Troubleshooting simulation failures (LINCS, exploding systems, barostat instability, PLUMED errors), (9) Polymer-solvent MD simulations for COSMO-RS analysis."
 ---
 
 # GROMACS Molecular Dynamics Skill
@@ -172,7 +172,62 @@ Unless specified otherwise, use:
 - **scripts/solvent_to_gmx.py**: Convert SMILES to GROMACS topology (SMILES → RDKit → ACPYPE)
 - **scripts/generate_swarm_job.sh**: Generate SLURM job scripts for swarm cluster
 - **scripts/check_equilibration.py**: Validate NVT/NPT equilibration quality
+- **scripts/analyze_density.py**: Track density evolution during MD simulations (requires MDAnalysis)
 - **scripts/gmx_wrapper.sh**: Auto-detect gmx_mpi vs gmx
+
+## Specialized Workflows
+
+### Polymer-Solvent MD for COSMO-RS
+
+Automated end-to-end workflow for polymer oligomer simulations in organic solvents, designed for COSMO-RS conformational analysis.
+
+**Quick Start:**
+```bash
+python workflows/polymer-cosmo/polymer_md_workflow.py \
+  --polymer PVDF \
+  --solvent NMP \
+  --work-dir ./pvdf_nmp
+```
+
+**Features:**
+- Auto-generates polymer oligomers with backbone atom validation (ideal: 10-12 atoms, max: 20)
+- Built-in polymer database: PVDF, PEO, PMMA, PS
+- Built-in solvent database: NMP, DMF, DMSO, THF, water, etc.
+- Intelligent solvent insertion (timeout-based retry with automatic target reduction)
+- Merged atomtypes with `[ defaults ]` section (prevents duplicate atomtype errors)
+- Generates swarm cluster and workstation submission scripts
+- Creates solvated boxes with 10,000-15,000 solvent molecules in 11×11×11 nm box
+
+**What it does:**
+1. ✅ Validates polymer + solvent SMILES (with user confirmation)
+2. ✅ Parameterizes both using ACPYPE (via `solvent_to_gmx.py`)
+3. ✅ Creates solvated simulation box
+4. ✅ Tests energy minimization
+5. ✅ Generates submission scripts for 5ns NPT + 10ns NVT
+
+**Documentation:**
+- **[workflows/polymer-cosmo/README.md](workflows/polymer-cosmo/README.md)**: Complete user guide
+- **[workflows/polymer-cosmo/WORKFLOW_SUMMARY.md](workflows/polymer-cosmo/WORKFLOW_SUMMARY.md)**: Technical details
+
+**Example usage:**
+```bash
+# PVDF 4mer in NMP
+python workflows/polymer-cosmo/polymer_md_workflow.py \
+  --polymer PVDF \
+  --solvent NMP \
+  --oligomer-size 4 \
+  --work-dir ./test_pvdf_nmp
+
+# Custom polymer and solvent SMILES
+python workflows/polymer-cosmo/polymer_md_workflow.py \
+  --polymer "C(C(F)(F))([H])[H]" \
+  --solvent "CN1CCCC1=O" \
+  --work-dir ./custom_sim
+```
+
+**Future modules** (in development):
+- Conformational sampling (Rg-SASA grid extraction from trajectory)
+- DFT input generation (ORCA COSMO-RS files)
 
 ## Reference Files
 
