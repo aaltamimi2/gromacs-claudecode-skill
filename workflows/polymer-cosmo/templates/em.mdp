@@ -1,0 +1,31 @@
+; em.mdp - Energy minimization for polymer-solvent systems
+integrator  = steep
+emtol       = 1000.0    ; kJ/mol/nm convergence criterion
+emstep      = 0.01      ; nm step size
+nsteps      = 50000     ; max iterations
+
+; Output control
+nstxout     = 500
+nstlog      = 500
+nstenergy   = 500
+
+; Neighbor searching
+cutoff-scheme   = Verlet
+nstlist         = 10
+ns_type         = grid
+pbc             = xyz
+rlist           = 1.2
+
+; Electrostatics
+coulombtype     = PME
+rcoulomb        = 1.2
+pme_order       = 4
+fourierspacing  = 0.12
+
+; Van der Waals
+vdwtype         = Cut-off
+rvdw            = 1.2
+DispCorr        = EnerPres
+
+; No velocity generation for EM
+gen_vel         = no

@@ -1,0 +1,53 @@
+; npt.mdp - NPT equilibration for polymer-solvent systems
+; 5 ns NPT equilibration
+
+integrator  = md
+dt          = 0.002         ; 2 fs timestep
+nsteps      = 2500000       ; 5 ns (2,500,000 steps * 2 fs)
+
+; Output control
+nstxout-compressed  = 5000  ; Save frame every 10 ps
+nstlog              = 5000  ; Log every 10 ps
+nstenergy           = 5000  ; Energy every 10 ps
+
+; Bond constraints
+continuation    = yes       ; Continue from NVT
+constraint_algorithm = LINCS
+constraints     = h-bonds
+lincs_iter      = 1
+lincs_order     = 4
+
+; Neighbor searching
+cutoff-scheme   = Verlet
+nstlist         = 20
+rlist           = 1.2
+pbc             = xyz
+
+; Electrostatics
+coulombtype     = PME
+rcoulomb        = 1.2
+pme_order       = 4
+fourierspacing  = 0.12
+
+; Van der Waals
+vdwtype         = Cut-off
+vdw-modifier    = Force-switch
+rvdw_switch     = 1.0
+rvdw            = 1.2
+DispCorr        = EnerPres
+
+; Temperature coupling
+tcoupl      = V-rescale
+tc_grps     = System
+tau_t       = 1.0
+ref_t       = 300
+
+; Pressure coupling
+pcoupl          = C-rescale
+pcoupltype      = isotropic
+tau_p           = 2.0
+ref_p           = 1.0
+compressibility = 4.5e-5
+
+; Velocity generation
+gen_vel     = no            ; Continue from NVT
