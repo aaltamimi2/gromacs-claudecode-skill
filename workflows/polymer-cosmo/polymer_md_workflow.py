@@ -195,12 +195,13 @@ class PolymerMDWorkflow:
 
         # Add solvent
         print("\n--- Adding Solvent Molecules ---")
-        solvated_gro = builder.add_solvent(boxed_gro, n_solvent)
+        solvated_gro, actual_n_solvent = builder.add_solvent(boxed_gro, n_solvent)
         print(f"✓ Solvated system: {solvated_gro}")
+        print(f"✓ Actual solvent molecules: {actual_n_solvent}")
 
         # Create topology
         print("\n--- Creating Topology ---")
-        topol = builder.create_topology(polymer_resname, solvent_resname, n_solvent)
+        topol = builder.create_topology(polymer_resname, solvent_resname, actual_n_solvent)
         print(f"✓ Topology: {topol}")
 
         if self.interactive:
