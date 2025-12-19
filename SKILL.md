@@ -172,6 +172,7 @@ Unless specified otherwise, use:
 - **scripts/solvent_to_gmx.py**: Convert SMILES to GROMACS topology (SMILES → RDKit → ACPYPE)
 - **scripts/generate_swarm_job.sh**: Generate SLURM job scripts for swarm cluster
 - **scripts/check_equilibration.py**: Validate NVT/NPT equilibration quality
+- **scripts/analyze_density.py**: Track density evolution during MD simulations (requires MDAnalysis)
 - **scripts/gmx_wrapper.sh**: Auto-detect gmx_mpi vs gmx
 
 ## Specialized Workflows
