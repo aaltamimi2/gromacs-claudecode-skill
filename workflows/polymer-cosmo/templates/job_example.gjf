@@ -1,0 +1,30 @@
+%nprocshared=56
+%mem=28GB
+%chk=A7.chk
+# bvp86/tzvp/dga1 scf=tight geom=connectivity opt=tight
+
+optimization of A7 structure in gas phase
+
+*structure*
+
+--Link1--
+%chk=A7.chk
+%mem=28GB
+%nproc=56
+# bvp86/tzvp/dga1 opt=tight geom=checkpoint scf=tight SCRF=(CPCM)
+
+optimization of A7 using CPCM in Water
+
+  0 1
+
+--Link1--
+%chk=A7.chk
+%mem=28GB
+%nproc=56
+# bvp86/tzvp/dga1 geom=checkpoint guess=read scf=tight SCRF=COSMORS
+
+ single point calculation of A7 for COSMO-RS using infinite dielectric constant
+
+ 0 1
+
+ A7.cosmo
