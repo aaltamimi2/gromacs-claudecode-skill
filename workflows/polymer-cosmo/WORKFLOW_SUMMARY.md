@@ -62,7 +62,8 @@ workflows/polymer-cosmo/
 ├── modules/
 │   ├── polymer_builder.py              # Oligomer generation & validation
 │   ├── box_builder.py                  # Solvated box creation
-│   └── submission_generator.py         # Script generation
+│   ├── submission_generator.py         # Script generation
+│   └── conformational_sampling.py      # Rg-SASA grid sampling (NEW!)
 ├── templates/
 │   ├── em.mdp                          # Energy minimization parameters
 │   ├── nvt.mdp                         # NVT (10 ns) parameters
@@ -106,6 +107,10 @@ python modules/box_builder.py ./test_dir \
 # Test submission generator
 python modules/submission_generator.py ./test_dir \
   --job-name test_job
+
+# Test conformational sampling (after MD completes)
+python modules/conformational_sampling.py npt.xtc npt.gro \
+  --grid-size 10 --plot
 ```
 
 ## Workflow Steps (Detailed)
