@@ -142,6 +142,8 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
     print(f"Topology:    {topology}")
     print(f"Grid size:   {grid_size}×{grid_size} = {grid_size**2} points")
     print(f"Threshold:   {threshold} (normalized units)")
+    print("\n⚠️  Reminder: Use a polymer-only trajectory for grid/umbrella sampling.")
+    print('   Example: echo "Polymer" | gmx trjconv -f npt.xtc -s npt.gro -o polymer_only.xtc')
     print("=" * 70)
 
     # Load trajectory
@@ -206,6 +208,9 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
 
     print(f"\n✓ Total conformers (grid + extremes): {len(final_indices)}")
 
+    # Capture frame times (ps) for extraction script
+    frame_times_ps = traj.time
+
     # Save results
     print(f"\nSaving results to {output_file}...")
     try:
@@ -258,10 +263,34 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
 
             f.write("mkdir -p ${OUTDIR}\n\n")
 
+            f.write("# Detect Polymer group automatically (override with POLYMER_GROUP)\n")
+            f.write("POLYMER_GROUP=${POLYMER_GROUP:-}\n")
+            f.write("detect_polymer_group() {\n")
+            f.write("    local top_file=\"$1\"\n")
+            f.write("    if ! command -v gmx >/dev/null 2>&1; then\n")
+            f.write("        return\n")
+            f.write("    fi\n")
+            f.write("    local ndx_output\n")
+            f.write("    ndx_output=$(gmx make_ndx -f \"$top_file\" -quiet << EOF\nq\nEOF\n)\n")
+            f.write("    echo \"$ndx_output\" | awk 'toupper($0) ~ /POLYMER/ && $1 ~ /^[0-9]+$/ {print $1; exit}'\n")
+            f.write("}\n\n")
+
+            f.write('if [ -z "$POLYMER_GROUP" ]; then\n')
+            f.write('    POLYMER_GROUP=$(detect_polymer_group "${TOP}")\n')
+            f.write('fi\n')
+            f.write('if [ -z "$POLYMER_GROUP" ]; then\n')
+            f.write('    echo "⚠️  Could not auto-detect Polymer group; defaulting to group 1."\n')
+            f.write('    POLYMER_GROUP=1\n')
+            f.write('else\n')
+            f.write('    echo "Using Polymer group index: ${POLYMER_GROUP}"\n')
+            f.write('fi\n\n')
+
             for i, idx in enumerate(final_indices):
-                f.write(f"# Conformer {i+1}: Frame {idx}\n")
-                f.write(f"echo 0 | gmx trjconv -f ${{TRAJ}} -s ${{TOP}} "
-                       f"-dump {idx} -o ${{OUTDIR}}/conformer_{i+1:03d}_frame{idx}.pdb\n")
+                time_ps = float(frame_times_ps[idx])
+                f.write(f"# Conformer {i+1}: Frame {idx} (t = {time_ps:.3f} ps)\n")
+                f.write(f"TARGET_TIME_PS={time_ps:.3f}\n")
+                f.write(f"echo ${{POLYMER_GROUP}} | gmx trjconv -f ${{TRAJ}} -s ${{TOP}} "
+                       f"-dump ${{TARGET_TIME_PS}} -o ${{OUTDIR}}/conformer_{i+1:03d}_frame{idx}.pdb\n\n")
 
             f.write("\necho \"✓ Extracted {len(final_indices)} conformers to ${OUTDIR}/\"\n")
 

@@ -163,6 +163,11 @@ echo "NPT Quality Check:"
 echo "Temperature" | gmx energy -f npt.edr -o npt_temp.xvg 2>&1 | grep "Average"
 echo "Pressure" | gmx energy -f npt.edr -o npt_press.xvg 2>&1 | grep "Average"
 echo "Density" | gmx energy -f npt.edr -o npt_density.xvg 2>&1 | grep "Average"
+
+echo ""
+echo "Reminder: Create a polymer-only trajectory for grid/umbrella sampling:"
+echo "  echo \"Polymer\" | gmx trjconv -f npt.xtc -s npt.gro -o npt_polymer.xtc"
+echo "Select the Polymer group (not 0/System) when prompted."
 """
 
         # Completion message
@@ -304,6 +309,11 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✓ NPT equilibration completed"
+
+echo ""
+echo "Reminder: Create a polymer-only trajectory for grid/umbrella sampling:"
+echo "  echo \"Polymer\" | gmx_mpi trjconv -f npt.xtc -s npt.gro -o npt_polymer.xtc"
+echo "Select the Polymer group (not 0/System) when prompted."
 """
 
         script += """
