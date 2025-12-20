@@ -207,11 +207,21 @@ def create_polymer_structure(polymer_name: str,
     oligomer_smiles, backbone_atoms = build_oligomer(monomer_smiles, oligomer_size)
 
     # Check backbone constraint
+    # If oligomer_size=1, user likely provided a complete oligomer SMILES (not a monomer)
+    # In this case, warn but don't error
     if backbone_atoms > max_backbone:
-        raise ValueError(
-            f"Oligomer has {backbone_atoms} backbone atoms, exceeds max {max_backbone}. "
-            f"Reduce oligomer size."
-        )
+        if oligomer_size == 1:
+            # User provided complete oligomer - warn but allow
+            print(f"\n⚠️  WARNING: Oligomer has {backbone_atoms} backbone atoms (exceeds recommended max {max_backbone})")
+            print(f"   This may result in slower simulations and DFT calculations.")
+            print(f"   Consider using a smaller oligomer if possible.")
+            print(f"   Proceeding anyway...\n")
+        else:
+            # Auto-generated from monomer - this is an error
+            raise ValueError(
+                f"Oligomer has {backbone_atoms} backbone atoms, exceeds max {max_backbone}. "
+                f"Reduce oligomer size to {int(max_backbone / (backbone_atoms / oligomer_size))} or fewer units."
+            )
 
     return {
         "monomer_smiles": monomer_smiles,
