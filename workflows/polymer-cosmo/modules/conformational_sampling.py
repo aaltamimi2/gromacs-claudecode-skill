@@ -211,7 +211,7 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
     # Capture frame times (ps) for extraction script
     frame_times_ps = traj.time
 
-    # Save results
+    # Save results (original format)
     print(f"\nSaving results to {output_file}...")
     try:
         with open(output_file, 'w') as f:
@@ -247,12 +247,47 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
         print(f"  {e}")
         sys.exit(1)
 
+    # Save CSV metadata for easy cross-referencing with extracted PDB files
+    csv_file = output_file.replace('.dat', '_metadata.csv')
+    print(f"Saving metadata CSV to {csv_file}...")
+    try:
+        import csv
+        with open(csv_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['conformer_id', 'conformer_file', 'frame', 'time_ps',
+                           'Rg_nm', 'SASA_nm2', 'Rg_norm', 'SASA_norm', 'source'])
+
+            for i, idx in enumerate(final_indices):
+                conformer_id = i + 1
+                conformer_file = f"conformer_{conformer_id:03d}_frame{idx}.pdb"
+                time_ps = float(frame_times_ps[idx])
+
+                source = []
+                if idx in selected_indices:
+                    source.append("grid")
+                if idx in lowest_rg_indices:
+                    source.append("low_Rg")
+                if idx in lowest_sasa_indices:
+                    source.append("low_SASA")
+                if idx in highest_rg_indices:
+                    source.append("high_Rg")
+                if idx in highest_sasa_indices:
+                    source.append("high_SASA")
+                source_str = "+".join(source)
+
+                writer.writerow([conformer_id, conformer_file, idx, f"{time_ps:.3f}",
+                               f"{rg[idx]:.4f}", f"{sasa[idx]:.2f}",
+                               f"{rg_norm[idx]:.4f}", f"{sasa_norm[idx]:.4f}",
+                               source_str])
+
+        print(f"✓ Saved metadata to {csv_file}")
+        print(f"  Use this file to cross-reference conformer PDB files with Rg-SASA values")
+    except Exception as e:
+        print(f"WARNING: Failed to save CSV metadata: {e}")
+
     # Generate trjconv extraction script
     extract_script = output_file.replace('.dat', '_extract.sh')
     print(f"\nGenerating extraction script: {extract_script}")
-
-    # Get timestep for frame-to-time conversion
-    dt_ps = traj.timestep  # Timestep in ps
 
     try:
         with open(extract_script, 'w') as f:
@@ -263,8 +298,7 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
 
             f.write("TRAJ=\"" + trajectory + "\"\n")
             f.write("TOP=\"" + topology + "\"\n")
-            f.write("OUTDIR=\"conformers\"\n")
-            f.write(f"DT_PS={dt_ps:.3f}  # Trajectory timestep in ps\n\n")
+            f.write("OUTDIR=\"conformers\"\n\n")
 
             f.write("mkdir -p ${OUTDIR}\n\n")
 
@@ -290,42 +324,24 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
             f.write('    echo "Using Polymer group index: ${POLYMER_GROUP}"\n')
             f.write('fi\n\n')
 
-            for i, idx in enumerate(final_indices):
-                time_ps = float(frame_times_ps[idx])
-                f.write(f"# Conformer {i+1}: Frame {idx} (t = {time_ps:.3f} ps)\n")
-                f.write(f"TARGET_TIME_PS={time_ps:.3f}\n")
-                f.write(f"echo ${{POLYMER_GROUP}} | gmx trjconv -f ${{TRAJ}} -s ${{TOP}} "
-                       f"-dump ${{TARGET_TIME_PS}} -o ${{OUTDIR}}/conformer_{i+1:03d}_frame{idx}.pdb\n\n")
-
-            f.write("# Detect polymer group (typically group 1, but verify!)\n")
-            f.write("# You can override this by setting POLYMER_GROUP before running\n")
-            f.write("if [ -z \"$POLYMER_GROUP\" ]; then\n")
-            f.write("    POLYMER_GROUP=1  # Default to group 1 (first molecule type)\n")
-            f.write("    echo \"Using default POLYMER_GROUP=1\"\n")
-            f.write("    echo \"If this is incorrect, run: POLYMER_GROUP=N ./" + str(Path(extract_script).name) + "\"\n")
-            f.write("    echo \"\"\n")
-            f.write("fi\n\n")
-
             f.write("echo \"Extracting conformers using group ${POLYMER_GROUP} (polymer only)...\"\n")
             f.write("echo \"\"\n\n")
 
             for i, idx in enumerate(final_indices):
-                # Convert frame to time in ps
-                time_ps = idx * dt_ps
-                f.write(f"# Conformer {i+1}: Frame {idx} (time = {time_ps:.2f} ps)\n")
-                f.write(f"echo ${{POLYMER_GROUP}} | gmx trjconv -f ${{TRAJ}} -s ${{TOP}} -n temp_index.ndx "
-                       f"-dump {time_ps:.2f} -o ${{OUTDIR}}/conformer_{i+1:03d}_frame{idx}.pdb > /dev/null 2>&1\n")
-
-            f.write("\n# Cleanup\n")
-            f.write("rm -f temp_index.ndx\n\n")
+                time_ps = float(frame_times_ps[idx])
+                f.write(f"# Conformer {i+1}: Frame {idx} (t = {time_ps:.3f} ps, Rg = {rg[idx]:.3f} nm, SASA = {sasa[idx]:.1f} nm²)\n")
+                f.write(f"echo ${{POLYMER_GROUP}} | gmx trjconv -f ${{TRAJ}} -s ${{TOP}} "
+                       f"-dump {time_ps:.3f} -o ${{OUTDIR}}/conformer_{i+1:03d}_frame{idx}.pdb > /dev/null 2>&1\n\n")
 
             f.write(f"echo \"\"\n")
             f.write(f"echo \"✓ Extracted {len(final_indices)} conformers to ${{OUTDIR}}/\"\n")
             f.write(f"echo \"✓ PDB files contain POLYMER ONLY (no solvent)\"\n")
+            f.write(f"echo \"✓ Metadata saved to conformers_metadata.csv\"\n")
             f.write(f"echo \"\"\n")
             f.write(f"echo \"Next steps:\"\n")
-            f.write(f"echo \"  1. Open PDB files in GaussView to create .gjf files\"\n")
-            f.write(f"echo \"  2. Run prepare_gaussian.py to add COSMO-RS commands\"\n")
+            f.write(f"echo \"  1. Review conformers_metadata.csv to see Rg-SASA values for each conformer\"\n")
+            f.write(f"echo \"  2. Open PDB files in GaussView to create .gjf files\"\n")
+            f.write(f"echo \"  3. Run prepare_gaussian.py to add COSMO-RS commands\"\n")
 
         Path(extract_script).chmod(0o755)
         print(f"✓ Extraction script saved")
@@ -367,15 +383,16 @@ def analyze_conformers(trajectory, topology, grid_size=10, threshold=0.03,
             print("\nGenerating plots...")
             plot_results(rg, sasa, rg_norm, sasa_norm, selected_indices,
                         grid_points, conformer_coords, lowest_rg_indices,
-                        lowest_sasa_indices, output_file)
+                        lowest_sasa_indices, highest_rg_indices, highest_sasa_indices,
+                        final_indices, output_file)
 
     return final_indices
 
 
 def plot_results(rg, sasa, rg_norm, sasa_norm, selected_indices,
                 grid_points, conformer_coords, lowest_rg, lowest_sasa,
-                output_file):
-    """Generate analysis plots."""
+                highest_rg, highest_sasa, final_indices, output_file):
+    """Generate analysis plots with conformer annotations."""
 
     matplotlib.rcParams['font.family'] = 'Arial'
     fig = plt.figure(figsize=(15, 10))
@@ -405,7 +422,7 @@ def plot_results(rg, sasa, rg_norm, sasa_norm, selected_indices,
     ax3.legend()
     ax3.grid(True, alpha=0.3)
 
-    # 4. Grid sampling visualization
+    # 4. Grid sampling visualization with conformer numbers
     ax4 = plt.subplot(2, 3, 4)
     # All frames
     ax4.scatter(rg_norm, sasa_norm, c='lightblue', alpha=0.3, s=10, label='All frames')
@@ -413,18 +430,29 @@ def plot_results(rg, sasa, rg_norm, sasa_norm, selected_indices,
     if grid_points:
         grid_x, grid_y = zip(*grid_points)
         ax4.scatter(grid_x, grid_y, c='red', s=30, marker='s', alpha=0.6, label='Grid points')
-    # Selected conformers
+    # Selected conformers with annotations
     if conformer_coords:
         conf_x, conf_y = zip(*conformer_coords)
         ax4.scatter(conf_x, conf_y, c='green', s=50, marker='x', linewidths=2,
                    label='Selected conformers')
+
+    # Annotate all final conformers with their IDs
+    for i, idx in enumerate(final_indices):
+        conformer_id = i + 1
+        # Only annotate a subset to avoid overcrowding (every 3rd conformer for large sets)
+        if len(final_indices) <= 30 or i % 3 == 0:
+            ax4.annotate(f'{conformer_id}',
+                        (rg_norm[idx], sasa_norm[idx]),
+                        xytext=(3, 3), textcoords='offset points',
+                        fontsize=6, alpha=0.7, color='darkgreen')
+
     ax4.set_xlabel('Normalized Rg', fontsize=11)
     ax4.set_ylabel('Normalized SASA', fontsize=11)
-    ax4.set_title('Grid Sampling', fontsize=12, fontweight='bold')
+    ax4.set_title('Grid Sampling (with conformer IDs)', fontsize=12, fontweight='bold')
     ax4.legend()
     ax4.grid(True, alpha=0.3)
 
-    # 5. Extreme conformers
+    # 5. Extreme conformers with annotations
     ax5 = plt.subplot(2, 3, 5)
     ax5.scatter(rg_norm, sasa_norm, c='lightgray', alpha=0.3, s=10, label='All frames')
     # Lowest Rg
@@ -433,10 +461,27 @@ def plot_results(rg, sasa, rg_norm, sasa_norm, selected_indices,
     # Lowest SASA
     ax5.scatter(rg_norm[lowest_sasa], sasa_norm[lowest_sasa], c='orange', s=100,
                marker='s', edgecolors='black', linewidths=1.5, label='Lowest SASA')
+    # Highest Rg
+    ax5.scatter(rg_norm[highest_rg], sasa_norm[highest_rg], c='purple', s=100,
+               marker='^', edgecolors='black', linewidths=1.5, label='Highest Rg')
+    # Highest SASA
+    ax5.scatter(rg_norm[highest_sasa], sasa_norm[highest_sasa], c='red', s=100,
+               marker='v', edgecolors='black', linewidths=1.5, label='Highest SASA')
+
+    # Annotate extreme conformers with their IDs
+    for idx in list(lowest_rg) + list(lowest_sasa) + list(highest_rg) + list(highest_sasa):
+        if idx in final_indices:
+            conformer_id = final_indices.index(idx) + 1
+            ax5.annotate(f'{conformer_id}',
+                        (rg_norm[idx], sasa_norm[idx]),
+                        xytext=(5, 5), textcoords='offset points',
+                        fontsize=7, fontweight='bold', color='black',
+                        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7, edgecolor='none'))
+
     ax5.set_xlabel('Normalized Rg', fontsize=11)
     ax5.set_ylabel('Normalized SASA', fontsize=11)
-    ax5.set_title('Extreme Conformers', fontsize=12, fontweight='bold')
-    ax5.legend()
+    ax5.set_title('Extreme Conformers (with IDs)', fontsize=12, fontweight='bold')
+    ax5.legend(fontsize=8, loc='best')
     ax5.grid(True, alpha=0.3)
 
     # 6. Time evolution
