@@ -146,7 +146,9 @@ def prepare_gaussian_inputs(conformer_dir, template_file, backup=True):
     print("  1. Gas phase geometry optimization (BP86/TZVP)")
     print("  2. CPCM optimization in water")
     print("  3. COSMO-RS single point calculation")
-    print("\nTo submit jobs, use your cluster's job scheduler.")
+    print("\nNext step - generate submission script:")
+    print("  python gaussian_submission_generator.py conformers/")
+    print("\nOr use your cluster's job scheduler manually.")
     print("=" * 70)
 
     return processed_files
