@@ -165,9 +165,54 @@ echo "Pressure" | gmx energy -f npt.edr -o npt_press.xvg 2>&1 | grep "Average"
 echo "Density" | gmx energy -f npt.edr -o npt_density.xvg 2>&1 | grep "Average"
 
 echo ""
-echo "Reminder: Create a polymer-only trajectory for grid/umbrella sampling:"
-echo "  echo \"Polymer\" | gmx trjconv -f npt.xtc -s npt.gro -o npt_polymer.xtc"
-echo "Select the Polymer group (not 0/System) when prompted."
+echo "=========================================="
+echo "Extracting Polymer-Only Trajectory"
+echo "=========================================="
+echo ""
+echo "⚠️  IMPORTANT: For conformational sampling, only the polymer should be used!"
+echo ""
+
+# Auto-detect polymer residue name from topology
+POLYMER_RES=$(grep -A 1 "\[ molecules \]" topol.top | tail -1 | awk '{print $1}')
+
+echo "Detected polymer residue: ${POLYMER_RES}"
+echo ""
+
+# Extract polymer trajectory (.xtc)
+echo "Extracting polymer trajectory from npt.xtc..."
+echo "${POLYMER_RES}" | gmx trjconv -f npt.xtc -s npt.tpr -o polymer_npt.xtc
+
+if [ $? -eq 0 ]; then
+    echo "✓ Created polymer_npt.xtc"
+else
+    echo "ERROR: Failed to extract polymer trajectory"
+    echo "Available groups:"
+    echo "q" | gmx make_ndx -f npt.tpr -o temp.ndx 2>&1 | grep "Group"
+    rm -f temp.ndx
+    exit 1
+fi
+
+# Extract polymer structure (.gro)
+echo ""
+echo "Extracting polymer structure from npt.gro..."
+echo "${POLYMER_RES}" | gmx trjconv -f npt.gro -s npt.tpr -o polymer_npt.gro -dump 0
+
+if [ $? -eq 0 ]; then
+    echo "✓ Created polymer_npt.gro"
+else
+    echo "ERROR: Failed to extract polymer structure"
+    exit 1
+fi
+
+echo ""
+echo "✓ Polymer extraction complete!"
+echo ""
+echo "  Trajectory: polymer_npt.xtc (polymer only)"
+echo "  Structure:  polymer_npt.gro (polymer only)"
+echo ""
+echo "  Next step - run conformational sampling:"
+echo "  python conformational_sampling.py polymer_npt.xtc polymer_npt.gro --grid-size 10 --plot"
+echo ""
 """
 
         # Completion message
@@ -311,9 +356,54 @@ fi
 echo "✓ NPT equilibration completed"
 
 echo ""
-echo "Reminder: Create a polymer-only trajectory for grid/umbrella sampling:"
-echo "  echo \"Polymer\" | gmx_mpi trjconv -f npt.xtc -s npt.gro -o npt_polymer.xtc"
-echo "Select the Polymer group (not 0/System) when prompted."
+echo "=========================================="
+echo "Extracting Polymer-Only Trajectory"
+echo "=========================================="
+echo ""
+echo "⚠️  IMPORTANT: For conformational sampling, only the polymer should be used!"
+echo ""
+
+# Auto-detect polymer residue name from topology
+POLYMER_RES=$(grep -A 1 "\[ molecules \]" topol.top | tail -1 | awk '{print $1}')
+
+echo "Detected polymer residue: ${POLYMER_RES}"
+echo ""
+
+# Extract polymer trajectory (.xtc)
+echo "Extracting polymer trajectory from npt.xtc..."
+echo "${POLYMER_RES}" | gmx_mpi trjconv -f npt.xtc -s npt.tpr -o polymer_npt.xtc
+
+if [ $? -eq 0 ]; then
+    echo "✓ Created polymer_npt.xtc"
+else
+    echo "ERROR: Failed to extract polymer trajectory"
+    echo "Available groups:"
+    echo "q" | gmx_mpi make_ndx -f npt.tpr -o temp.ndx 2>&1 | grep "Group"
+    rm -f temp.ndx
+    exit 1
+fi
+
+# Extract polymer structure (.gro)
+echo ""
+echo "Extracting polymer structure from npt.gro..."
+echo "${POLYMER_RES}" | gmx_mpi trjconv -f npt.gro -s npt.tpr -o polymer_npt.gro -dump 0
+
+if [ $? -eq 0 ]; then
+    echo "✓ Created polymer_npt.gro"
+else
+    echo "ERROR: Failed to extract polymer structure"
+    exit 1
+fi
+
+echo ""
+echo "✓ Polymer extraction complete!"
+echo ""
+echo "  Trajectory: polymer_npt.xtc (polymer only)"
+echo "  Structure:  polymer_npt.gro (polymer only)"
+echo ""
+echo "  Next step - run conformational sampling:"
+echo "  python conformational_sampling.py polymer_npt.xtc polymer_npt.gro --grid-size 10 --plot"
+echo ""
 """
 
         script += """
